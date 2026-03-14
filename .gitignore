@@ -1,0 +1,18 @@
+# env
+.env
+
+# logs
+*.log
+
+# build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# tmp
+tmp/
