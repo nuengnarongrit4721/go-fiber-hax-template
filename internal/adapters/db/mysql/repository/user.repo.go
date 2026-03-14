@@ -20,7 +20,7 @@ func NewUserRepo(db *gorm.DB) *UserRepo {
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id string) (domain.User, error) {
-	var model m.Users
+	var model m.User
 	err := r.db.WithContext(ctx).First(&model, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -30,7 +30,7 @@ func (r *UserRepo) GetByID(ctx context.Context, id string) (domain.User, error) 
 	}
 
 	return domain.User{
-		ID:    model.ID,
+		ID:    model.ID.String(),
 		Name:  model.Name,
 		Email: model.Email,
 	}, nil

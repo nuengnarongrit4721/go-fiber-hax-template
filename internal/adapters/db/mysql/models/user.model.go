@@ -1,11 +1,11 @@
 package models
 
-type Users struct {
-	ID    string `gorm:"column:id;primaryKey"`
+type User struct {
+	BaseModel
 	Name  string `gorm:"column:name"`
 	Email string `gorm:"column:email"`
 }
 
-func (Users) TableName() string {
+func (User) TableName() string {
 	return "users"
 }
