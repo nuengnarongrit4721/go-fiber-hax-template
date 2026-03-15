@@ -31,5 +31,5 @@ func (h *UserHandler) GetByID(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "internal error")
 	}
 
-	return response.JSON(c, fiber.StatusOK, user)
+	return response.JSON(c, fiber.StatusOK, ToUserResponse(user))
 }

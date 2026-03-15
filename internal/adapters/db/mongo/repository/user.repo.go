@@ -35,14 +35,5 @@ func (r *UserRepo) GetByID(ctx context.Context, id string) (d.Users, error) {
 		return d.Users{}, err
 	}
 
-	return d.Users{
-		AccountID: doc.AccountID,
-		Fname:     doc.Fname,
-		Lname:     doc.Lname,
-		FullName:  doc.FullName,
-		Username:  doc.Username,
-		Password:  doc.Password,
-		Email:     doc.Email,
-		Phone:     doc.Phone,
-	}, nil
+	return ToDomainUser(&doc), nil
 }

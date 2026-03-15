@@ -32,10 +32,17 @@ func Connect(cfg config.MongoConfig) (*Connector, error) {
 		return nil, err
 	}
 
-	return &Connector{
+	db := client.Database(cfg.DB)
+	connector := &Connector{
 		Client: client,
-		DB:     client.Database(cfg.DB),
-	}, nil
+		DB:     db,
+	}
+
+	if err := autoIndex(connector.DB); err != nil {
+		return nil, fmt.Errorf("mongo auto index failed: %w", err)
+	}
+
+	return connector, nil
 }
 
 func (c *Connector) Close(ctx context.Context) error {
