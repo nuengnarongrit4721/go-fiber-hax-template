@@ -16,7 +16,10 @@ type Connector struct {
 
 func Connect(cfg config.MySQLConfig) (*Connector, error) {
 
-	db, err := gorm.Open(mysqlDriver.Open(cfg.DSN), &gorm.Config{})
+	db, err := gorm.Open(mysqlDriver.New(mysqlDriver.Config{
+		DSN:               cfg.DSN,
+		DefaultStringSize: 191,
+	}), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

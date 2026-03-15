@@ -119,7 +119,7 @@ GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 
 ## Logging
 - `LOG_FORMAT=pretty` for multi-line output (debug-friendly)
-- Use `log.DebugPretty("msg", payload)` to print structured data nicely
+- See `internal/infra/logs/README.md` for usage and formats
 
 ## Notes
 - MySQL uses GORM; auto-migration is optional via `MYSQL_AUTO_MIGRATE=true`.

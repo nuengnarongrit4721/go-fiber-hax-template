@@ -42,7 +42,14 @@ func Register(app *fiber.App, set handlers.VersionedSet, opts Options) {
 }
 
 func registerPublicRoutes(r fiber.Router, set handlers.Set) {
-	_ = set
+	if set.Auth == nil {
+		return
+	}
+	auth := r.Group("/auth")
+	{
+		auth.Post("/login", set.Auth.Login)
+		auth.Post("/register", set.Auth.Register)
+	}
 }
 
 func registerProtectedRoutes(r fiber.Router, set handlers.Set) {
@@ -50,7 +57,12 @@ func registerProtectedRoutes(r fiber.Router, set handlers.Set) {
 		return
 	}
 	users := r.Group("/users")
-	users.Get("/:id", set.User.GetByID)
+	{
+		users.Get("/:account_id", set.User.GetByAccountIDHandler)
+		users.Post("/", nil)
+		users.Put("/:id", nil)
+		users.Delete("/:id", nil)
+	}
 }
 
 func registerSystemRoutes(r fiber.Router) {

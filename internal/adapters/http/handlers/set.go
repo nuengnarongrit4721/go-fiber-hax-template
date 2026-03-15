@@ -2,6 +2,7 @@ package handlers
 
 type Set struct {
 	User *UserHandler
+	Auth *AuthHandler
 }
 
 type VersionedSet struct {

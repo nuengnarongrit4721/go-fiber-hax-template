@@ -83,7 +83,7 @@ type JWTConfig struct {
 }
 
 func Load() (Config, error) {
-	_ = godotenv.Load()
+	loadEnv()
 
 	cfg := Config{
 		App: AppConfig{
@@ -178,6 +178,15 @@ func Load() (Config, error) {
 		}
 	}
 	return cfg, nil
+}
+
+func loadEnv() {
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if env == "prod" || env == "production" {
+		_ = godotenv.Load(".env")
+		return
+	}
+	_ = godotenv.Overload(".env")
 }
 
 func getEnv(key, def string) string {

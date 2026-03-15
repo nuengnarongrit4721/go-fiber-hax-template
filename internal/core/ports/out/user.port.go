@@ -6,5 +6,6 @@ import (
 )
 
 type UserRepository interface {
-	GetByID(ctx context.Context, id string) (d.Users, error)
+	CreateUser(ctx context.Context, req *d.Users) error
+	GetByAccountID(ctx context.Context, AccountID string) (d.Users, error)
 }

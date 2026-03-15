@@ -21,6 +21,7 @@ type Repos struct {
 
 type Services struct {
 	User *service.UserService
+	Auth *service.AuthService
 }
 
 type HandlerSet struct {

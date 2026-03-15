@@ -8,6 +8,7 @@ import (
 	"gofiber-hax/internal/adapters/db/mongo"
 	"gofiber-hax/internal/adapters/db/mysql"
 	"gofiber-hax/internal/infra/config"
+	"gofiber-hax/internal/infra/logs"
 )
 
 func buildDB(cfg config.Config, logger *slog.Logger) (*DB, func(ctx context.Context) error, error) {
@@ -48,7 +49,7 @@ func connectMongo(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, 
 	}
 	dbs.Mongo = conn
 	closers.add(conn.Close)
-	logger.Info("Connected to MongoDB")
+	logs.Info("Connected to MongoDB Success")
 	return nil
 }
 
@@ -68,7 +69,8 @@ func connectMySQL(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, 
 	}
 	dbs.MySQL = conn
 	closers.add(conn.Close)
-	logger.Info("Connected to MySQL")
+	logs.Info("Connected to MySQL Success")
+
 	return nil
 }
 
@@ -84,6 +86,6 @@ func connectMySQLReplica(cfg config.Config, logger *slog.Logger, mode string, db
 	}
 	dbs.MySQLReplica = conn
 	closers.add(conn.Close)
-	logger.Info("Connected to MySQL Replica")
+	logs.Info("Connected to MySQL Replica Success")
 	return nil
 }

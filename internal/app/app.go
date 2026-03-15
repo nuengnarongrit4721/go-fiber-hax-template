@@ -69,8 +69,11 @@ func buildRepos(db *DB) (Repos, error) {
 }
 
 func buildServices(repos Repos) Services {
+	userService := service.NewUserService(repos.User)
+	authService := service.NewAuthService(userService)
 	return Services{
-		User: service.NewUserService(repos.User),
+		User: userService,
+		Auth: authService,
 	}
 }
 
@@ -79,6 +82,7 @@ func buildHandlers(services Services, logger *slog.Logger) HandlerSet {
 		HTTP: handlers.VersionedSet{
 			V1: handlers.Set{
 				User: handlers.NewUserHandler(services.User, logger),
+				Auth: handlers.NewAuthHandler(services.Auth),
 			},
 			V2: handlers.Set{
 				User: nil,

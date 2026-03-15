@@ -8,7 +8,6 @@ import (
 	coreerrors "gofiber-hax/internal/shared/errors"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -20,12 +19,14 @@ func NewUserRepo(db *mongo.Database) *UserRepo {
 	return &UserRepo{col: db.Collection("users")}
 }
 
-func (r *UserRepo) GetByID(ctx context.Context, id string) (d.Users, error) {
-	filter := bson.M{"_id": id}
-	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-		filter = bson.M{"_id": oid}
-	}
+func (r *UserRepo) CreateUser(ctx context.Context, req *d.Users) error {
+	mUsers := ToMongoUser(*req)
+	_, err := r.col.InsertOne(ctx, mUsers)
+	return err
+}
 
+func (r *UserRepo) GetByAccountID(ctx context.Context, AccountID string) (d.Users, error) {
+	filter := bson.M{"account_id": AccountID}
 	var doc m.Users
 	err := r.col.FindOne(ctx, filter).Decode(&doc)
 	if err != nil {

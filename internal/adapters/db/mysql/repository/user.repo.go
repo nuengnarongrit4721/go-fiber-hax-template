@@ -3,10 +3,12 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	m "gofiber-hax/internal/adapters/db/mysql/models"
 	d "gofiber-hax/internal/core/domain"
-	coreerrors "gofiber-hax/internal/shared/errors"
+	"gofiber-hax/internal/core/ports/out"
+	errs "gofiber-hax/internal/shared/errors"
 
 	"gorm.io/gorm"
 )
@@ -19,12 +21,22 @@ func NewUserRepo(db *gorm.DB) *UserRepo {
 	return &UserRepo{db: db}
 }
 
-func (r *UserRepo) GetByID(ctx context.Context, id string) (d.Users, error) {
+var _ out.UserRepository = (*UserRepo)(nil)
+
+func (r *UserRepo) CreateUser(ctx context.Context, req *d.Users) error {
+	mUsers := ToModelUser(req)
+	if err := r.db.WithContext(ctx).Create(&mUsers).Error; err != nil {
+		return fmt.Errorf("mysql.userrepo.create error: %w", err)
+	}
+	return nil
+}
+
+func (r *UserRepo) GetByAccountID(ctx context.Context, AccountID string) (d.Users, error) {
 	var model *m.Users
-	err := r.db.WithContext(ctx).First(&model, "id = ?", id).Error
+	err := r.db.WithContext(ctx).First(&model, "account_id = ?", AccountID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return d.Users{}, coreerrors.ErrNotFound
+			return d.Users{}, errs.ErrNotFound
 		}
 		return d.Users{}, err
 	}

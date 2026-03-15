@@ -7,6 +7,7 @@ import (
 	d "gofiber-hax/internal/core/domain"
 	portsin "gofiber-hax/internal/core/ports/in"
 	"gofiber-hax/internal/core/ports/out"
+	"gofiber-hax/internal/infra/logs"
 )
 
 type UserService struct {
@@ -19,9 +20,19 @@ func NewUserService(repo out.UserRepository) *UserService {
 
 var _ portsin.UserService = (*UserService)(nil)
 
-func (s *UserService) GetByID(ctx context.Context, id string) (d.Users, error) {
-	if id == "" {
-		return d.Users{}, fmt.Errorf("id is required")
+func (s *UserService) CreateUserService(ctx context.Context, req *d.Users) error {
+	if err := s.repo.CreateUser(ctx, req); err != nil {
+		return fmt.Errorf("userservice.create error: %w", err)
 	}
-	return s.repo.GetByID(ctx, id)
+	return nil
+}
+
+func (s *UserService) GetByAccountIDService(ctx context.Context, accountID string) (d.Users, error) {
+	result, err := s.repo.GetByAccountID(ctx, accountID)
+	if err != nil {
+		return d.Users{}, fmt.Errorf("userservice.GetByAccountIDService error: %w", err)
+	}
+
+	logs.Debug(result)
+	return result, nil
 }

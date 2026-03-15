@@ -6,5 +6,6 @@ import (
 )
 
 type UserService interface {
-	GetByID(ctx context.Context, id string) (d.Users, error)
+	CreateUserService(ctx context.Context, req *d.Users) error
+	GetByAccountIDService(ctx context.Context, accountID string) (d.Users, error)
 }
