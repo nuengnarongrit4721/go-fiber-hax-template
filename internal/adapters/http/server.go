@@ -2,8 +2,10 @@ package http
 
 import (
 	"context"
+	"log/slog"
 
 	"gofiber-hax/internal/adapters/http/handlers"
+	"gofiber-hax/internal/adapters/http/middleware"
 	"gofiber-hax/internal/adapters/http/routes"
 	"gofiber-hax/internal/infra/config"
 
@@ -15,8 +17,10 @@ type Server struct {
 	addr string
 }
 
-func NewServer(cfg config.HTTPConfig, set handlers.VersionedSet, opts routes.Options) *Server {
+func NewServer(cfg config.HTTPConfig, set handlers.VersionedSet, opts routes.Options, logger *slog.Logger) *Server {
 	app := fiber.New()
+
+	app.Use(middleware.AccessLogger(cfg.AccessLog))
 
 	routes.Register(app, set, opts)
 

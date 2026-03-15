@@ -24,7 +24,8 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
-	Addr string
+	Addr      string
+	AccessLog AccessLogConfig
 }
 
 type DBConfig struct {
@@ -50,7 +51,13 @@ type MySQLConfig struct {
 
 type LogConfig struct {
 	Level  string // debug | info | warn | error
-	Format string // json | pretty
+	Format string // json | pretty | text
+}
+
+type AccessLogConfig struct {
+	Enabled    bool
+	Format     string
+	TimeFormat string
 }
 
 type AuthConfig struct {
@@ -81,6 +88,11 @@ func Load() (Config, error) {
 		},
 		HTTP: HTTPConfig{
 			Addr: getEnv("HTTP_ADDR", ":8080"),
+			AccessLog: AccessLogConfig{
+				Enabled:    getEnvBool("HTTP_ACCESS_LOG", false),
+				Format:     getEnv("HTTP_ACCESS_LOG_FORMAT", `${ip} - - [${time}] "${method} ${url} ${protocol}" ${status} ${bytesSent}`+"\n"),
+				TimeFormat: getEnv("HTTP_ACCESS_LOG_TIME_FORMAT", "02/Jan/2006:15:04:05 -0700"),
+			},
 		},
 		DB: DBConfig{
 			Driver: strings.ToLower(getEnv("DB_DRIVER", "auto")),

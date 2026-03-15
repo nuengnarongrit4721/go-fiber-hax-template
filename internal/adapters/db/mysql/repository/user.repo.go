@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	m "gofiber-hax/internal/adapters/db/mysql/models"
-	"gofiber-hax/internal/core/domain"
+	d "gofiber-hax/internal/core/domain"
 	coreerrors "gofiber-hax/internal/shared/errors"
 
 	"gorm.io/gorm"
@@ -19,19 +19,34 @@ func NewUserRepo(db *gorm.DB) *UserRepo {
 	return &UserRepo{db: db}
 }
 
-func (r *UserRepo) GetByID(ctx context.Context, id string) (domain.User, error) {
-	var model m.User
+func (r *UserRepo) GetByID(ctx context.Context, id string) (d.Users, error) {
+	var model m.Users
 	err := r.db.WithContext(ctx).First(&model, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.User{}, coreerrors.ErrNotFound
+			return d.Users{}, coreerrors.ErrNotFound
 		}
-		return domain.User{}, err
+		return d.Users{}, err
 	}
 
-	return domain.User{
-		ID:    model.ID.String(),
-		Name:  model.Name,
-		Email: model.Email,
-	}, nil
+	return toDomain(model), nil
+}
+
+func toDomain(m m.Users) d.Users {
+	return d.Users{
+		BaseDomain: d.BaseDomain{
+			ID:        m.ID,
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			DeletedAt: m.DeletedAt,
+		},
+		AccountID: m.AccountID,
+		Fname:     m.Fname,
+		Lname:     m.Lname,
+		FullName:  m.FullName,
+		Username:  m.Username,
+		Password:  m.Password,
+		Email:     m.Email,
+		Phone:     m.Phone,
+	}
 }

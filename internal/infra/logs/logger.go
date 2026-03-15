@@ -10,8 +10,13 @@ import (
 
 func New(cfg config.LogConfig) *slog.Logger {
 	level := parseLevel(cfg.Level)
-	if strings.ToLower(cfg.Format) == "pretty" {
+	switch strings.ToLower(cfg.Format) {
+	case "pretty":
 		logger := slog.New(NewPrettyHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+		slog.SetDefault(logger)
+		return logger
+	case "text", "logfmt", "line":
+		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 		slog.SetDefault(logger)
 		return logger
 	}

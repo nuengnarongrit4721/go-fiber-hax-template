@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"gofiber-hax/internal/core/domain"
+	d "gofiber-hax/internal/core/domain"
 	portsin "gofiber-hax/internal/core/ports/in"
 	"gofiber-hax/internal/core/ports/out"
 )
@@ -19,9 +19,9 @@ func NewUserService(repo out.UserRepository) *UserService {
 
 var _ portsin.UserService = (*UserService)(nil)
 
-func (s *UserService) GetByID(ctx context.Context, id string) (domain.User, error) {
+func (s *UserService) GetByID(ctx context.Context, id string) (d.Users, error) {
 	if id == "" {
-		return domain.User{}, fmt.Errorf("id is required")
+		return d.Users{}, fmt.Errorf("id is required")
 	}
 	return s.repo.GetByID(ctx, id)
 }

@@ -3,7 +3,8 @@ package mongo
 import (
 	"context"
 
-	"gofiber-hax/internal/core/domain"
+	m "gofiber-hax/internal/adapters/db/mongo/models"
+	d "gofiber-hax/internal/core/domain"
 	coreerrors "gofiber-hax/internal/shared/errors"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,34 +16,33 @@ type UserRepo struct {
 	col *mongo.Collection
 }
 
-type userDoc struct {
-	ID    primitive.ObjectID `bson:"_id,omitempty"`
-	Name  string             `bson:"name"`
-	Email string             `bson:"email"`
-}
-
 func NewUserRepo(db *mongo.Database) *UserRepo {
 	return &UserRepo{col: db.Collection("users")}
 }
 
-func (r *UserRepo) GetByID(ctx context.Context, id string) (domain.User, error) {
+func (r *UserRepo) GetByID(ctx context.Context, id string) (d.Users, error) {
 	filter := bson.M{"_id": id}
 	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
 		filter = bson.M{"_id": oid}
 	}
 
-	var doc userDoc
+	var doc m.Users
 	err := r.col.FindOne(ctx, filter).Decode(&doc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return domain.User{}, coreerrors.ErrNotFound
+			return d.Users{}, coreerrors.ErrNotFound
 		}
-		return domain.User{}, err
+		return d.Users{}, err
 	}
 
-	return domain.User{
-		ID:    doc.ID.Hex(),
-		Name:  doc.Name,
-		Email: doc.Email,
+	return d.Users{
+		AccountID: doc.AccountID,
+		Fname:     doc.Fname,
+		Lname:     doc.Lname,
+		FullName:  doc.FullName,
+		Username:  doc.Username,
+		Password:  doc.Password,
+		Email:     doc.Email,
+		Phone:     doc.Phone,
 	}, nil
 }
