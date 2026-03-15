@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log/slog"
 	"strings"
 )
 
@@ -35,10 +34,4 @@ func wantMongo(mode string) bool {
 
 func wantMySQL(mode string) bool {
 	return mode == "mysql" || mode == "both" || mode == "auto"
-}
-
-func logInfo(logger *slog.Logger, msg string) {
-	if logger != nil {
-		logger.Info(msg)
-	}
 }

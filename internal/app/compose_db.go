@@ -15,13 +15,13 @@ func buildDB(cfg config.Config, logger *slog.Logger) (*DB, func(ctx context.Cont
 	dbs := &DB{Driver: mode}
 	closers := closeGroup{}
 
-	if err := connectMongoIfNeeded(cfg, logger, mode, dbs, &closers); err != nil {
+	if err := connectMongo(cfg, logger, mode, dbs, &closers); err != nil {
 		return nil, nil, err
 	}
-	if err := connectMySQLIfNeeded(cfg, logger, mode, dbs, &closers); err != nil {
+	if err := connectMySQL(cfg, logger, mode, dbs, &closers); err != nil {
 		return nil, nil, err
 	}
-	if err := connectMySQLReplicaIfNeeded(cfg, logger, mode, dbs, &closers); err != nil {
+	if err := connectMySQLReplica(cfg, logger, mode, dbs, &closers); err != nil {
 		return nil, nil, err
 	}
 
@@ -32,7 +32,7 @@ func buildDB(cfg config.Config, logger *slog.Logger) (*DB, func(ctx context.Cont
 	return dbs, closers.close, nil
 }
 
-func connectMongoIfNeeded(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
+func connectMongo(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
 	if !wantMongo(mode) {
 		return nil
 	}
@@ -48,11 +48,11 @@ func connectMongoIfNeeded(cfg config.Config, logger *slog.Logger, mode string, d
 	}
 	dbs.Mongo = conn
 	closers.add(conn.Close)
-	logInfo(logger, "Connected to MongoDB")
+	logger.Info("Connected to MongoDB")
 	return nil
 }
 
-func connectMySQLIfNeeded(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
+func connectMySQL(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
 	if !wantMySQL(mode) {
 		return nil
 	}
@@ -68,11 +68,11 @@ func connectMySQLIfNeeded(cfg config.Config, logger *slog.Logger, mode string, d
 	}
 	dbs.MySQL = conn
 	closers.add(conn.Close)
-	logInfo(logger, "Connected to MySQL")
+	logger.Info("Connected to MySQL")
 	return nil
 }
 
-func connectMySQLReplicaIfNeeded(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
+func connectMySQLReplica(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
 	if !wantMySQL(mode) || cfg.DB.MySQL.ReplicaDSN == "" {
 		return nil
 	}
@@ -84,6 +84,6 @@ func connectMySQLReplicaIfNeeded(cfg config.Config, logger *slog.Logger, mode st
 	}
 	dbs.MySQLReplica = conn
 	closers.add(conn.Close)
-	logInfo(logger, "Connected to MySQL Replica")
+	logger.Info("Connected to MySQL Replica")
 	return nil
 }

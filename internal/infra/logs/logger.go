@@ -6,21 +6,35 @@ import (
 	"strings"
 
 	"gofiber-hax/internal/infra/config"
+
+	slogzap "github.com/samber/slog-zap/v2"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func New(cfg config.LogConfig) *slog.Logger {
 	level := parseLevel(cfg.Level)
+	zapLevel := zap.NewAtomicLevelAt(slogLevelToZap(level))
+
+	var encoder zapcore.Encoder
+
 	switch strings.ToLower(cfg.Format) {
 	case "pretty":
-		logger := slog.New(NewPrettyHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
-		slog.SetDefault(logger)
-		return logger
+		encCfg := zap.NewDevelopmentEncoderConfig()
+		encCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		encoder = zapcore.NewConsoleEncoder(encCfg)
 	case "text", "logfmt", "line":
-		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
-		slog.SetDefault(logger)
-		return logger
+		encCfg := zap.NewProductionEncoderConfig()
+		encoder = zapcore.NewConsoleEncoder(encCfg)
+	default:
+		encCfg := zap.NewProductionEncoderConfig()
+		encoder = zapcore.NewJSONEncoder(encCfg)
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+
+	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), zapLevel)
+	zapLogger := zap.New(core)
+
+	logger := slog.New(slogzap.Option{Level: level, Logger: zapLogger}.NewZapHandler())
 	slog.SetDefault(logger)
 	return logger
 }
@@ -37,5 +51,20 @@ func parseLevel(lvl string) slog.Level {
 		return slog.LevelError
 	default:
 		return slog.LevelInfo
+	}
+}
+
+func slogLevelToZap(l slog.Level) zapcore.Level {
+	switch l {
+	case slog.LevelDebug:
+		return zapcore.DebugLevel
+	case slog.LevelInfo:
+		return zapcore.InfoLevel
+	case slog.LevelWarn:
+		return zapcore.WarnLevel
+	case slog.LevelError:
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
 	}
 }

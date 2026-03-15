@@ -24,8 +24,12 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
-	Addr      string
-	AccessLog AccessLogConfig
+	Addr         string
+	Host         string
+	AccessLog    AccessLogConfig
+	AlowOrigins  string
+	AllowHeaders string
+	AllowMethods string
 }
 
 type DBConfig struct {
@@ -87,9 +91,12 @@ func Load() (Config, error) {
 			Env:  getEnv("APP_ENV", "dev"),
 		},
 		HTTP: HTTPConfig{
-			Addr: getEnv("HTTP_ADDR", ":8080"),
+			Addr:         getEnv("FIBER_ADDR", "5000"),
+			Host:         getEnv("FIBER_HOST", "127.0.0.1"),
+			AlowOrigins:  getEnv("FIBER_ALLOW_ORIGINS", "*"),
+			AllowHeaders: getEnv("FIBER_ALLOW_HEADERS", "Origin,Content-Type,Accept,Authorization"),
+			AllowMethods: getEnv("FIBER_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS"),
 			AccessLog: AccessLogConfig{
-				Enabled:    getEnvBool("HTTP_ACCESS_LOG", false),
 				Format:     getEnv("HTTP_ACCESS_LOG_FORMAT", `${ip} - - [${time}] "${method} ${url} ${protocol}" ${status} ${bytesSent}`+"\n"),
 				TimeFormat: getEnv("HTTP_ACCESS_LOG_TIME_FORMAT", "02/Jan/2006:15:04:05 -0700"),
 			},
