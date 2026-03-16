@@ -28,23 +28,25 @@ internal/
 
 ## Quick Start
 ```bash
-# 1) install deps
-
 go mod tidy
-
-# 2) run
-
-go run . serve
+go run . start
 ```
 
 ## Environment
 `.env` is loaded automatically via `godotenv`.
+- In `APP_ENV=prod|production` it **does not** override existing system env.
+- In other environments it **does** override system env (dev-friendly).
 
 Minimal example:
 ```env
 APP_NAME=gofiber-hax
 APP_ENV=dev
-HTTP_ADDR=:8080
+
+FIBER_ADDR=5001
+FIBER_HOST=127.0.0.1
+FIBER_ALLOW_ORIGINS=*
+FIBER_ALLOW_HEADERS=Origin,Content-Type,Accept,Authorization
+FIBER_ALLOW_METHODS=GET,POST,PUT,DELETE,OPTIONS
 
 # DB: auto | mongo | mysql | both
 DB_DRIVER=auto
@@ -52,6 +54,10 @@ DB_DRIVER=auto
 # Mongo
 MONGO_URI=mongodb://localhost:27017
 MONGO_DB=example_db
+MONGO_HOST=localhost
+MONGO_PORT=27017
+MONGO_USER=
+MONGO_PASS=
 
 # MySQL
 MYSQL_DSN=root:password@tcp(127.0.0.1:3306)/app?parseTime=true
@@ -59,8 +65,12 @@ MYSQL_REPLICA_DSN=
 MYSQL_AUTO_MIGRATE=false
 
 # Logging
-LOG_LEVEL=debug
-LOG_FORMAT=pretty
+LOG_LEVEL=info
+LOG_FORMAT=json   # json | pretty | text | logfmt | line
+
+# HTTP access log (Common Log Format)
+HTTP_ACCESS_LOG_FORMAT=${ip} - - [${time}] "${method} ${url} ${protocol}" ${status} ${bytesSent}
+HTTP_ACCESS_LOG_TIME_FORMAT=02/Jan/2006:15:04:05 -0700
 
 # Auth (protected routes)
 AUTH_ENABLED=false
@@ -80,17 +90,16 @@ JWT_CLOCK_SKEW_SEC=60
 
 ## Routes
 Base prefix: `/api/{version}`
-
-- Public:
-  - `GET /api/v1/health`
-  - `GET /api/v1/ready`
-- Protected:
-  - `GET /api/v1/users/:id`
+- `GET /api/v1/health`
+- `GET /api/v1/ready`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/register`
+- `GET /api/v1/users/:account_id` (protected)
 
 Versioned handlers are separated in code (`V1`, `V2`) to allow different behavior per version.
 
 ## Auth Modes
-### 1) Simple Token
+Simple token:
 ```
 AUTH_ENABLED=true
 AUTH_MODE=token
@@ -101,7 +110,7 @@ Request example:
 Authorization: Bearer secret123
 ```
 
-### 2) JWT (generic)
+JWT (generic):
 ```
 AUTH_ENABLED=true
 AUTH_MODE=jwt
@@ -110,7 +119,7 @@ JWT_AUDIENCE=my-api
 JWT_JWKS_URL=https://issuer.example/.well-known/jwks.json
 ```
 
-### 3) Google ID Token
+Google ID Token:
 ```
 AUTH_ENABLED=true
 AUTH_MODE=google
@@ -119,10 +128,14 @@ GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 
 ## Logging
 - `LOG_FORMAT=pretty` for multi-line output (debug-friendly)
+- `LOG_FORMAT=text|logfmt|line` for single-line console
+- `LOG_FORMAT=json` for log systems
+- HTTP access log uses Common Log Format (configure `HTTP_ACCESS_LOG_FORMAT` and `HTTP_ACCESS_LOG_TIME_FORMAT`)
 - See `internal/infra/logs/README.md` for usage and formats
 
 ## Notes
 - MySQL uses GORM; auto-migration is optional via `MYSQL_AUTO_MIGRATE=true`.
+- When `DB_DRIVER=both`, the User repo currently prefers MySQL.
 - For real OAuth (access token introspection), add an introspection validator (not included yet).
 
 ## Adding New Feature (example flow)
@@ -133,7 +146,7 @@ handler -> service -> repo (port out) -> adapter
 - Add repo interface in `core/ports/out`
 - Implement repo in `adapters/db/*`
 - Add service in `core/service`
-- Wire in `internal/app/compose.go`
+- Wire in `internal/app/app.go`
 - Register routes in `adapters/http/routes`
 
 ## License

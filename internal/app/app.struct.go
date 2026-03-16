@@ -15,15 +15,18 @@ type DB struct {
 	MySQLReplica *mysql.Connector
 }
 
+// NOTE: DB Logic
 type Repos struct {
 	User out.UserRepository
 }
 
+// NOTE: Business Logic
 type Services struct {
 	User *service.UserService
 	Auth *service.AuthService
 }
 
+// NOTE: HTTP Logic
 type HandlerSet struct {
 	HTTP handlers.VersionedSet
 }

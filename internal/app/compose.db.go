@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"gofiber-hax/internal/adapters/db/mongo"
 	"gofiber-hax/internal/adapters/db/mysql"
@@ -11,18 +10,18 @@ import (
 	"gofiber-hax/internal/infra/logs"
 )
 
-func buildDB(cfg config.Config, logger *slog.Logger) (*DB, func(ctx context.Context) error, error) {
+func buildDB(cfg config.Config) (*DB, func(ctx context.Context) error, error) {
 	mode := normalizeMode(cfg.DB.Driver)
 	dbs := &DB{Driver: mode}
 	closers := closeGroup{}
 
-	if err := connectMongo(cfg, logger, mode, dbs, &closers); err != nil {
+	if err := connectMongo(cfg, mode, dbs, &closers); err != nil {
 		return nil, nil, err
 	}
-	if err := connectMySQL(cfg, logger, mode, dbs, &closers); err != nil {
+	if err := connectMySQL(cfg, mode, dbs, &closers); err != nil {
 		return nil, nil, err
 	}
-	if err := connectMySQLReplica(cfg, logger, mode, dbs, &closers); err != nil {
+	if err := connectMySQLReplica(cfg, mode, dbs, &closers); err != nil {
 		return nil, nil, err
 	}
 
@@ -33,7 +32,7 @@ func buildDB(cfg config.Config, logger *slog.Logger) (*DB, func(ctx context.Cont
 	return dbs, closers.close, nil
 }
 
-func connectMongo(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
+func connectMongo(cfg config.Config, mode string, dbs *DB, closers *closeGroup) error {
 	if !wantMongo(mode) {
 		return nil
 	}
@@ -53,7 +52,7 @@ func connectMongo(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, 
 	return nil
 }
 
-func connectMySQL(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
+func connectMySQL(cfg config.Config, mode string, dbs *DB, closers *closeGroup) error {
 	if !wantMySQL(mode) {
 		return nil
 	}
@@ -74,7 +73,7 @@ func connectMySQL(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, 
 	return nil
 }
 
-func connectMySQLReplica(cfg config.Config, logger *slog.Logger, mode string, dbs *DB, closers *closeGroup) error {
+func connectMySQLReplica(cfg config.Config, mode string, dbs *DB, closers *closeGroup) error {
 	if !wantMySQL(mode) || cfg.DB.MySQL.ReplicaDSN == "" {
 		return nil
 	}

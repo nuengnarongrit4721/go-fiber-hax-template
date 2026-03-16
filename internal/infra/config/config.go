@@ -112,7 +112,7 @@ func Load() (Config, error) {
 				Pass: getEnv("MONGO_PASS", ""),
 			},
 			MySQL: MySQLConfig{
-				DSN:         getEnv("MYSQL_DSN", "root:password@tcp(127.0.0.1:3306)/app?parseTime=true"),
+				DSN:         getEnv("MYSQL_DSN", "root:@tcp(127.0.0.1:3306)/app?parseTime=true"),
 				ReplicaDSN:  getEnv("MYSQL_REPLICA_DSN", ""),
 				AutoMigrate: getEnvBool("MYSQL_AUTO_MIGRATE", false),
 			},
@@ -177,6 +177,7 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("unsupported AUTH_MODE: %s", cfg.Auth.Mode)
 		}
 	}
+
 	return cfg, nil
 }
 

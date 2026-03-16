@@ -25,7 +25,7 @@ type App struct {
 var defaultAPIVersions = []string{"v1", "v2"}
 
 func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
-	db, closeDB, err := buildDB(cfg, logger)
+	db, closeDB, err := buildDB(cfg)
 	if err != nil {
 		return nil, err
 	}
