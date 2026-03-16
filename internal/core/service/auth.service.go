@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"gofiber-hax/internal/adapters/http/dto"
+
 	d "gofiber-hax/internal/core/domain"
 	"gofiber-hax/internal/core/ports/in"
+	errs "gofiber-hax/internal/shared/errors"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,14 +19,20 @@ func NewAuthService(userService in.UserService) *AuthService {
 	return &AuthService{userService: userService}
 }
 
-func (s *AuthService) RegisterService(ctx context.Context, req *dto.RegisterRequest) error {
+func (s *AuthService) RegisterService(ctx context.Context, req *d.RegisterUserInput) error {
+	if req == nil {
+		return fmt.Errorf("authservice.register error: %w", errs.ErrInvalidInput)
+	}
+	if err := validateRegisterInput(req); err != nil {
+		return err
+	}
 	if req.Password != req.ConfirmPassword {
-		return errors.New("password and confirm password do not match")
+		return fmt.Errorf("authservice.register error: %w", errs.ErrInvalidInput)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return errors.New("failed to hash password")
+		return fmt.Errorf("authservice.register error: failed to hash password")
 	}
 
 	req.Password = string(hashedPassword)
@@ -45,6 +51,24 @@ func (s *AuthService) RegisterService(ctx context.Context, req *dto.RegisterRequ
 		return fmt.Errorf("authservice.register error: %w", err)
 	}
 
+	return nil
+}
+
+func validateRegisterInput(req *d.RegisterUserInput) error {
+	required := map[string]string{
+		"fname":            req.Fname,
+		"lname":            req.Lname,
+		"username":         req.Username,
+		"email":            req.Email,
+		"phone":            req.Phone,
+		"password":         req.Password,
+		"confirm_password": req.ConfirmPassword,
+	}
+	for _, value := range required {
+		if value == "" {
+			return fmt.Errorf("authservice.register error: %w", errs.ErrInvalidInput)
+		}
+	}
 	return nil
 }
 

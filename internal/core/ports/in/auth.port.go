@@ -2,9 +2,10 @@ package in
 
 import (
 	"context"
-	"gofiber-hax/internal/adapters/http/dto"
+
+	d "gofiber-hax/internal/core/domain"
 )
 
 type AuthService interface {
-	RegisterService(ctx context.Context, req *dto.RegisterRequest) error
+	RegisterService(ctx context.Context, req *d.RegisterUserInput) error
 }

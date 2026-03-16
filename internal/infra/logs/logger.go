@@ -14,9 +14,6 @@ import (
 func New(cfg config.LogConfig) *slog.Logger {
 	level := parseLevel(cfg.Level)
 	zapLevel := zap.NewAtomicLevelAt(slogLevelToZap(level))
-	if cfg.Level == "info" {
-		cfg.Format = "json"
-	}
 	logFormat = normalizeFormat(cfg.Format)
 	prodEncCfg := zap.NewProductionEncoderConfig()
 	prodEncCfg.EncodeTime = zapcore.ISO8601TimeEncoder

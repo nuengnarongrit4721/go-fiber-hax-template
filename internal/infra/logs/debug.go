@@ -31,13 +31,13 @@ func printPrettyDebug(w io.Writer, pc uintptr, details errorDetails, message int
 
 func debugPayload(message interface{}, args ...any) any {
 	if !isSimpleMessage(message) {
-		return message
+		return sanitize(message)
 	}
 	if len(args) == 0 {
 		return nil
 	}
 	if len(args) == 1 {
-		return args[0]
+		return sanitize(args[0])
 	}
 	return kvArgsToMap(args...)
 }
@@ -50,7 +50,11 @@ func kvArgsToMap(args ...any) map[string]any {
 	for i := 0; i < len(args); i += 2 {
 		key := fmt.Sprintf("%v", args[i])
 		if i+1 < len(args) {
-			m[key] = args[i+1]
+			if isSensitiveName(key) {
+				m[key] = "[REDACTED]"
+			} else {
+				m[key] = sanitize(args[i+1])
+			}
 		} else {
 			m[key] = true
 		}

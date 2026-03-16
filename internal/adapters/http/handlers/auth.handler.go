@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"errors"
 	"gofiber-hax/internal/adapters/http/dto"
+	d "gofiber-hax/internal/core/domain"
 	"gofiber-hax/internal/core/ports/in"
 	"gofiber-hax/internal/infra/logs"
 	errs "gofiber-hax/internal/shared/errors"
@@ -29,8 +31,21 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, errs.ErrInvalidInput.Error())
 	}
 
-	if err := h.as.RegisterService(c.UserContext(), &req); err != nil {
+	input := &d.RegisterUserInput{
+		Fname:           req.Fname,
+		Lname:           req.Lname,
+		Username:        req.Username,
+		Email:           req.Email,
+		Phone:           req.Phone,
+		Password:        req.Password,
+		ConfirmPassword: req.ConfirmPassword,
+	}
+
+	if err := h.as.RegisterService(c.UserContext(), input); err != nil {
 		logs.Error(err)
+		if errors.Is(err, errs.ErrInvalidInput) {
+			return response.Error(c, fiber.StatusBadRequest, errs.ErrInvalidInput.Error())
+		}
 		return response.Error(c, fiber.StatusInternalServerError, errs.ErrInternalServer.Error())
 	}
 

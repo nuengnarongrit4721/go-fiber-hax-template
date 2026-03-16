@@ -10,9 +10,10 @@ import (
 func Error(message interface{}, args ...any) {
 	pc := callerPC(3)
 	details := parseError(message)
+	safeArgs := sanitizeArgs(args...)
 
 	if logFormat == formatPretty {
-		printPrettyError(os.Stdout, pc, details, args...)
+		printPrettyError(os.Stdout, pc, details, safeArgs...)
 		return
 	}
 
@@ -20,7 +21,7 @@ func Error(message interface{}, args ...any) {
 	if details.Trace != "" {
 		record.Add(slog.String("trace", details.Trace))
 	}
-	record.Add(args...)
+	record.Add(safeArgs...)
 	_ = slog.Default().Handler().Handle(context.Background(), record)
 }
 
@@ -43,8 +44,9 @@ func logWithLevel(level slog.Level, message interface{}, args ...any) {
 	}
 	pc := callerPC(4)
 	details := parseError(message)
+	safeArgs := sanitizeArgs(args...)
 	if logFormat == formatPretty && level == slog.LevelDebug {
-		printPrettyDebug(debugOutput(), pc, details, message, args...)
+		printPrettyDebug(debugOutput(), pc, details, sanitize(message), safeArgs...)
 		return
 	}
 	record := slog.NewRecord(time.Now(), level, details.Message, pc)
@@ -52,8 +54,8 @@ func logWithLevel(level slog.Level, message interface{}, args ...any) {
 		record.Add(slog.String("trace", details.Trace))
 	}
 	if !isSimpleMessage(message) {
-		record.Add(slog.Any("data", message))
+		record.Add(slog.Any("data", sanitize(message)))
 	}
-	record.Add(args...)
+	record.Add(safeArgs...)
 	_ = slog.Default().Handler().Handle(ctx, record)
 }

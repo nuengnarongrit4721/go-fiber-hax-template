@@ -7,7 +7,6 @@ import (
 	d "gofiber-hax/internal/core/domain"
 	portsin "gofiber-hax/internal/core/ports/in"
 	"gofiber-hax/internal/core/ports/out"
-	"gofiber-hax/internal/infra/logs"
 )
 
 type UserService struct {
@@ -32,7 +31,5 @@ func (s *UserService) GetByAccountIDService(ctx context.Context, accountID strin
 	if err != nil {
 		return d.Users{}, fmt.Errorf("userservice.GetByAccountIDService error: %w", err)
 	}
-
-	logs.Debug(result)
 	return result, nil
 }

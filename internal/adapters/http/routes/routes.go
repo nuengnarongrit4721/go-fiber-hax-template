@@ -24,23 +24,23 @@ func Register(app *fiber.App, set handlers.VersionedSet, opts Options) {
 	for _, ver := range versions {
 		v := api.Group("/" + ver)
 		public := v.Group("", opts.Public...)
-		protected := v.Group("", opts.Protected...)
 
 		registerSystemRoutes(public)
 		switch ver {
 		case "v1":
 			registerPublicRoutes(public, set.V1)
-			registerProtectedRoutes(protected, set.V1)
+			registerProtectedRoutes(v, set.V1, opts.Protected...)
 		case "v2":
 			registerPublicRoutes(public, set.V2)
-			registerProtectedRoutes(protected, set.V2)
+			registerProtectedRoutes(v, set.V2, opts.Protected...)
 		default:
 			registerPublicRoutes(public, set.V1)
-			registerProtectedRoutes(protected, set.V1)
+			registerProtectedRoutes(v, set.V1, opts.Protected...)
 		}
 	}
 }
 
+/* NO Middleware */
 func registerPublicRoutes(r fiber.Router, set handlers.Set) {
 	if set.Auth == nil {
 		return
@@ -52,19 +52,18 @@ func registerPublicRoutes(r fiber.Router, set handlers.Set) {
 	}
 }
 
-func registerProtectedRoutes(r fiber.Router, set handlers.Set) {
+/* Middleware */
+func registerProtectedRoutes(r fiber.Router, set handlers.Set, middleware ...fiber.Handler) {
 	if set.User == nil {
 		return
 	}
-	users := r.Group("/users")
+	users := r.Group("/users", middleware...)
 	{
 		users.Get("/:account_id", set.User.GetByAccountIDHandler)
-		users.Post("/", nil)
-		users.Put("/:id", nil)
-		users.Delete("/:id", nil)
 	}
 }
 
+/* System Routes */
 func registerSystemRoutes(r fiber.Router) {
 	r.Get("/health", func(c *fiber.Ctx) error {
 		return response.JSON(c, fiber.StatusOK, fiber.Map{"status": "ok"})

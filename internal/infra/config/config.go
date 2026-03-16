@@ -26,10 +26,16 @@ type AppConfig struct {
 type HTTPConfig struct {
 	Addr         string
 	Host         string
+	BodyLimit    int
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
+	RequestTTL   time.Duration
 	AccessLog    AccessLogConfig
-	AlowOrigins  string
+	AllowOrigins string
 	AllowHeaders string
 	AllowMethods string
+	RateLimit    RateLimitConfig
 }
 
 type DBConfig struct {
@@ -64,6 +70,12 @@ type AccessLogConfig struct {
 	TimeFormat string
 }
 
+type RateLimitConfig struct {
+	Enabled bool
+	Max     int
+	Window  time.Duration
+}
+
 type AuthConfig struct {
 	Enabled bool
 	Mode    string // token | jwt | google
@@ -93,12 +105,23 @@ func Load() (Config, error) {
 		HTTP: HTTPConfig{
 			Addr:         getEnv("FIBER_ADDR", "5000"),
 			Host:         getEnv("FIBER_HOST", "127.0.0.1"),
-			AlowOrigins:  getEnv("FIBER_ALLOW_ORIGINS", "*"),
-			AllowHeaders: getEnv("FIBER_ALLOW_HEADERS", "Origin,Content-Type,Accept,Authorization"),
+			BodyLimit:    getEnvInt("HTTP_BODY_LIMIT_MB", 4) * 1024 * 1024,
+			ReadTimeout:  time.Duration(getEnvInt("HTTP_READ_TIMEOUT_SEC", 15)) * time.Second,
+			WriteTimeout: time.Duration(getEnvInt("HTTP_WRITE_TIMEOUT_SEC", 15)) * time.Second,
+			IdleTimeout:  time.Duration(getEnvInt("HTTP_IDLE_TIMEOUT_SEC", 30)) * time.Second,
+			RequestTTL:   time.Duration(getEnvInt("HTTP_REQUEST_TIMEOUT_SEC", 15)) * time.Second,
+			AllowOrigins: getEnv("FIBER_ALLOW_ORIGINS", "*"),
+			AllowHeaders: getEnv("FIBER_ALLOW_HEADERS", "Origin,Content-Type,Accept,Authorization,X-Request-ID"),
 			AllowMethods: getEnv("FIBER_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS"),
 			AccessLog: AccessLogConfig{
+				Enabled:    getEnvBool("HTTP_ACCESS_LOG_ENABLED", true),
 				Format:     getEnv("HTTP_ACCESS_LOG_FORMAT", `${ip} - - [${time}] "${method} ${url} ${protocol}" ${status} ${bytesSent}`+"\n"),
 				TimeFormat: getEnv("HTTP_ACCESS_LOG_TIME_FORMAT", "02/Jan/2006:15:04:05 -0700"),
+			},
+			RateLimit: RateLimitConfig{
+				Enabled: getEnvBool("HTTP_RATE_LIMIT_ENABLED", true),
+				Max:     getEnvInt("HTTP_RATE_LIMIT_MAX", 100),
+				Window:  time.Duration(getEnvInt("HTTP_RATE_LIMIT_WINDOW_SEC", 60)) * time.Second,
 			},
 		},
 		DB: DBConfig{
