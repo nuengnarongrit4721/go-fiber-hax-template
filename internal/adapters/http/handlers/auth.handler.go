@@ -20,11 +20,11 @@ func NewAuthHandler(as in.AuthService) *AuthHandler {
 	return &AuthHandler{as: as}
 }
 
-func (h *AuthHandler) Login(c *fiber.Ctx) error {
+func (h *AuthHandler) LoginEndpoint(c *fiber.Ctx) error {
 	return nil
 }
 
-func (h *AuthHandler) Register(c *fiber.Ctx) error {
+func (h *AuthHandler) RegisterEndpoint(c *fiber.Ctx) error {
 	var req dto.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		logs.Error(err)

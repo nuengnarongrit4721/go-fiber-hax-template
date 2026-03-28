@@ -13,6 +13,7 @@ import (
 	"gofiber-hax/internal/adapters/http/routes"
 	"gofiber-hax/internal/core/service"
 	"gofiber-hax/internal/infra/config"
+	"gofiber-hax/internal/infra/jwt"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -28,6 +29,14 @@ var defaultAPIVersions = []string{"v1", "v2"}
 NOTE: Build App
 */
 func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
+
+	// รันตัวปั๊มกุญแจ หาไฟล์ไม่เจอก็สร้างให้เลย
+	priv, pub, err := jwt.LoadOrGenerateKeys("keys/jwt_private.pem")
+	if err != nil {
+		return nil, err
+	}
+	signer := jwt.NewSigner(priv, pub)
+
 	db, closeDB, err := buildDB(cfg)
 	if err != nil {
 		return nil, err
@@ -39,7 +48,7 @@ func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	services := buildServices(repos)
-	handlers := buildHandlers(services, logger)
+	handlers := buildHandlers(services, logger, signer)
 
 	server := httpadapter.NewServer(cfg.HTTP, handlers.HTTP, buildRouteOptions(cfg), logger)
 
@@ -92,12 +101,13 @@ func buildServices(repos Repos) Services {
 /*
 NOTE: Build Handler
 */
-func buildHandlers(services Services, logger *slog.Logger) HandlerSet {
+func buildHandlers(services Services, logger *slog.Logger, signer *jwt.Signer) HandlerSet {
 	return HandlerSet{
 		HTTP: handlers.VersionedSet{
 			V1: handlers.Set{
 				User: handlers.NewUserHandler(services.User, logger),
 				Auth: handlers.NewAuthHandler(services.Auth),
+				JWKS: handlers.NewJwksHandler(signer),
 			},
 			V2: handlers.Set{
 				User: nil,

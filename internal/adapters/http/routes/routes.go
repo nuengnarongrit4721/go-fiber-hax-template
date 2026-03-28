@@ -13,8 +13,17 @@ type Options struct {
 	Protected []fiber.Handler
 }
 
-func Register(app *fiber.App, set handlers.VersionedSet, opts Options) {
+func Register(
+	app *fiber.App,
+	set handlers.VersionedSet,
+	opts Options,
+) {
 	api := app.Group("/api")
+
+	// ลงทะเบียน Endpoint JWKS ที่นี่
+	if set.V1.JWKS != nil {
+		api.Get("/.well-known/jwks.json", set.V1.JWKS.GetKeysEndpoint)
+	}
 
 	versions := opts.Versions
 	if len(versions) == 0 {
@@ -47,8 +56,8 @@ func registerPublicRoutes(r fiber.Router, set handlers.Set) {
 	}
 	auth := r.Group("/auth")
 	{
-		auth.Post("/login", set.Auth.Login)
-		auth.Post("/register", set.Auth.Register)
+		auth.Post("/login", set.Auth.LoginEndpoint)
+		auth.Post("/register", set.Auth.RegisterEndpoint)
 	}
 }
 
