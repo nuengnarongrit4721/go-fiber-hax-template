@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	repoMogo "gofiber-hax/internal/adapters/db/mongo/repository"
 	repoMsql "gofiber-hax/internal/adapters/db/mysql/repository"
 	httpadapter "gofiber-hax/internal/adapters/http"
 	"gofiber-hax/internal/adapters/http/handlers"
@@ -47,7 +46,7 @@ func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	services := buildServices(repos)
+	services := buildServices(cfg, repos, signer)
 	handlers := buildHandlers(services, logger, signer)
 
 	server := httpadapter.NewServer(cfg.HTTP, handlers.HTTP, buildRouteOptions(cfg), logger)
@@ -80,7 +79,7 @@ func buildRepos(db *DB) (Repos, error) {
 	}
 	if db.Mongo != nil {
 		return Repos{
-			User: repoMogo.NewUserRepo(db.Mongo.DB),
+			// User: repoMogo.NewUserRepo(db.Mongo.DB),
 		}, nil
 	}
 	return Repos{}, fmt.Errorf("no database available for user repo")
@@ -89,9 +88,9 @@ func buildRepos(db *DB) (Repos, error) {
 /*
 NOTE: Build Service
 */
-func buildServices(repos Repos) Services {
+func buildServices(cfg config.Config, repos Repos, signer *jwt.Signer) Services {
 	userService := service.NewUserService(repos.User)
-	authService := service.NewAuthService(userService)
+	authService := service.NewAuthService(userService, signer, cfg.Auth)
 	return Services{
 		User: userService,
 		Auth: authService,

@@ -40,6 +40,17 @@ func (r *UserRepo) GetByAccountID(ctx context.Context, AccountID string) (d.User
 		}
 		return d.Users{}, err
 	}
+	return ToDomainUser(model), nil
+}
 
+func (r *UserRepo) GetByUsername(ctx context.Context, username string) (d.Users, error) {
+	var model *m.Users
+	err := r.db.WithContext(ctx).First(&model, "username = ?", username).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return d.Users{}, errs.ErrNotFound
+		}
+		return d.Users{}, err
+	}
 	return ToDomainUser(model), nil
 }

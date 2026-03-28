@@ -20,7 +20,7 @@ func Register(
 ) {
 	api := app.Group("/api")
 
-	// ลงทะเบียน Endpoint JWKS ที่นี่
+	// NOTE:เช็ค Public Key
 	if set.V1.JWKS != nil {
 		api.Get("/.well-known/jwks.json", set.V1.JWKS.GetKeysEndpoint)
 	}

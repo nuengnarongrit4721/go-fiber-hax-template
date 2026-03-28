@@ -13,7 +13,6 @@ import (
 func AccessLogger(cfg config.AccessLogConfig) fiber.Handler {
 	format := cfg.Format
 	if format == "" || format == "pretty" {
-		// รูปแบบ CommonFormat แบบที่เห็นในภาพ
 		format = "${ip} - - [${time}] \"${method} ${url} ${protocol}\" ${status} ${bytesSent}\n"
 	}
 	format = ensureTrailingNewline(format)
@@ -22,6 +21,7 @@ func AccessLogger(cfg config.AccessLogConfig) fiber.Handler {
 		Format:     format,
 		TimeFormat: cfg.TimeFormat,
 		Output:     os.Stdout,
+		Next:       SkipBackgroundTasks,
 	})
 }
 

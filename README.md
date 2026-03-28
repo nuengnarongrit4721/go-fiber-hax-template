@@ -8,7 +8,8 @@ Hexagonal (Ports & Adapters) starter for GoFiber with manual DI, multi-DB (Mongo
 - Multi-DB support (Mongo + MySQL, optional MySQL replica)
 - Versioned API routes (v1/v2 handlers separated)
 - Pretty logs for dev (multi-line, array-friendly)
-- Auth middleware: shared token or JWT/Google ID token
+- Self-Hosted Identity Provider (RS256 JWKS) with Automated Key Generation
+- Flexible Auth Middleware: Token, Self-Hosted JWT, or Google OAuth
 
 ## Project Structure (simplified)
 ```
@@ -81,10 +82,14 @@ AUTH_SCHEME=Bearer
 
 # JWT / Google OAuth (ID token)
 GOOGLE_CLIENT_ID=
-JWT_ISSUER=
-JWT_AUDIENCE=
-JWT_JWKS_URL=
+JWT_ALG=RS256
+JWT_ISSUER=http://localhost:5001
+JWT_AUDIENCE=gofiber-hax-client
+JWT_JWKS_URL=http://127.0.0.1:5001/api/.well-known/jwks.json
 JWT_JWKS_TTL_SEC=3600
+JWT_CLOCK_SKEW_SEC=60
+JWT_ACCESS_TTL_SEC=900
+JWT_REFRESH_TTL_SEC=604800
 JWT_CLOCK_SKEW_SEC=60
 ```
 
@@ -92,9 +97,12 @@ JWT_CLOCK_SKEW_SEC=60
 Base prefix: `/api/{version}`
 - `GET /api/v1/health`
 - `GET /api/v1/ready`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/register` (creates user via bcrypt)
+- `POST /api/v1/auth/login` (issues RS256 JWT)
 - `GET /api/v1/users/:account_id` (protected)
+
+Identity Provider (IdP) endpoints:
+- `GET /api/.well-known/jwks.json` (Exposes Public Key Set for dynamic JWT verification)
 
 Versioned handlers are separated in code (`V1`, `V2`) to allow different behavior per version.
 
@@ -110,14 +118,16 @@ Request example:
 Authorization: Bearer secret123
 ```
 
-JWT (generic):
-```
+Self-Hosted JWT (Asymmetric RS256):
+```env
 AUTH_ENABLED=true
 AUTH_MODE=jwt
-JWT_ISSUER=https://issuer.example
-JWT_AUDIENCE=my-api
-JWT_JWKS_URL=https://issuer.example/.well-known/jwks.json
+JWT_ALG=RS256
+JWT_ISSUER=http://localhost:5001
+JWT_AUDIENCE=gofiber-hax-client
+JWT_JWKS_URL=http://127.0.0.1:5001/api/.well-known/jwks.json
 ```
+*Note: The system automatically provisions and persists an RSA-2048 key pair in `keys/jwt_private.pem` upon startup.*
 
 Google ID Token:
 ```

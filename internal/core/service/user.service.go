@@ -33,3 +33,11 @@ func (s *UserService) GetByAccountIDService(ctx context.Context, accountID strin
 	}
 	return result, nil
 }
+
+func (s *UserService) GetUserByUsernameService(ctx context.Context, username string) (d.Users, error) {
+	result, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return d.Users{}, fmt.Errorf("userservice.GetUserByUsernameService error: %w", err)
+	}
+	return result, nil
+}

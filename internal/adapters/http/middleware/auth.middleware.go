@@ -6,6 +6,7 @@ import (
 
 	"gofiber-hax/internal/infra/config"
 	"gofiber-hax/internal/infra/jwt"
+	"gofiber-hax/internal/infra/logs"
 	"gofiber-hax/internal/shared/response"
 
 	"github.com/gofiber/fiber/v2"
@@ -29,12 +30,12 @@ func Auth(cfg config.AuthConfig) fiber.Handler {
 
 		token, err := extractToken(c, cfg)
 		if err != nil {
+			logs.Error(err)
 			return response.Error(c, fiber.StatusUnauthorized, "unauthorized")
 		}
 
 		switch mode {
 		case "token":
-			// Token Auth: Validates against a static token defined in config
 			if strings.TrimSpace(cfg.Token) == "" || token != strings.TrimSpace(cfg.Token) {
 				return response.Error(c, fiber.StatusUnauthorized, "unauthorized")
 			}
@@ -45,6 +46,7 @@ func Auth(cfg config.AuthConfig) fiber.Handler {
 
 			claims, err := jwtVal.Validate(token)
 			if err != nil {
+				logs.Error(err)
 				return response.Error(c, fiber.StatusUnauthorized, "unauthorized")
 			}
 

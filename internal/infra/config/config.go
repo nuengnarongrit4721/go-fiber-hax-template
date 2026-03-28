@@ -86,12 +86,14 @@ type AuthConfig struct {
 }
 
 type JWTConfig struct {
-	Issuer      string
-	Audience    string
-	JWKSURL     string
-	CacheTTL    time.Duration
-	ClockSkew   time.Duration
-	AllowedAlgs []string
+	Issuer          string
+	Audience        string
+	JWKSURL         string
+	CacheTTL        time.Duration
+	ClockSkew       time.Duration
+	AllowedAlgs     []string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
 }
 
 func Load() (Config, error) {
@@ -171,12 +173,16 @@ func Load() (Config, error) {
 		Header:  getEnv("AUTH_HEADER", "Authorization"),
 		Scheme:  getEnv("AUTH_SCHEME", "Bearer"),
 		JWT: JWTConfig{
-			Issuer:      jwtIssuer,
-			Audience:    jwtAud,
-			JWKSURL:     jwtJWKS,
-			CacheTTL:    time.Duration(getEnvInt("JWT_JWKS_TTL_SEC", 3600)) * time.Second,
-			ClockSkew:   time.Duration(getEnvInt("JWT_CLOCK_SKEW_SEC", 60)) * time.Second,
-			AllowedAlgs: []string{"RS256"},
+			Issuer:    jwtIssuer,
+			Audience:  jwtAud,
+			JWKSURL:   jwtJWKS,
+			CacheTTL:  time.Duration(getEnvInt("JWT_JWKS_TTL_SEC", 3600)) * time.Second,
+			ClockSkew: time.Duration(getEnvInt("JWT_CLOCK_SKEW_SEC", 60)) * time.Second,
+			AllowedAlgs: []string{
+				getEnv("JWT_ALG", "RS256"),
+			},
+			AccessTokenTTL:  time.Duration(getEnvInt("JWT_ACCESS_TTL_SEC", 900)) * time.Second,
+			RefreshTokenTTL: time.Duration(getEnvInt("JWT_REFRESH_TTL_SEC", 604800)) * time.Second,
 		},
 	}
 

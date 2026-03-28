@@ -21,7 +21,32 @@ func NewAuthHandler(as in.AuthService) *AuthHandler {
 }
 
 func (h *AuthHandler) LoginEndpoint(c *fiber.Ctx) error {
-	return nil
+	var req dto.LoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		logs.Error(err)
+		return response.Error(c, fiber.StatusBadRequest, errs.ErrInvalidInput.Error())
+	}
+
+	input := &d.LoginUserInput{
+		Username: req.Username,
+		Password: req.Password,
+	}
+
+	token, err := h.as.LoginService(c.UserContext(), input)
+	if err != nil {
+		logs.Error(err)
+		if errors.Is(err, errs.ErrInvalidInput) {
+			return response.Error(c, fiber.StatusBadRequest, errs.ErrInvalidInput.Error())
+		}
+		if errors.Is(err, errs.ErrUnauthorized) {
+			return response.Error(c, fiber.StatusUnauthorized, errs.ErrUnauthorized.Error())
+		}
+		return response.Error(c, fiber.StatusInternalServerError, errs.ErrInternalServer.Error())
+	}
+
+	return response.JSON(c, fiber.StatusOK, fiber.Map{
+		"access_token": token,
+	})
 }
 
 func (h *AuthHandler) RegisterEndpoint(c *fiber.Ctx) error {

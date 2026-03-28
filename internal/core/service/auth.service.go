@@ -3,21 +3,37 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	d "gofiber-hax/internal/core/domain"
 	"gofiber-hax/internal/core/ports/in"
+	auth "gofiber-hax/internal/infra/config"
+	"gofiber-hax/internal/infra/jwt"
 	errs "gofiber-hax/internal/shared/errors"
 
+	gojwt "github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
 	userService in.UserService
+	signer      *jwt.Signer
+	cfg         auth.AuthConfig
 }
 
-func NewAuthService(userService in.UserService) *AuthService {
-	return &AuthService{userService: userService}
+func NewAuthService(
+	userService in.UserService,
+	signer *jwt.Signer,
+	cfg auth.AuthConfig,
+) *AuthService {
+	return &AuthService{
+		userService: userService,
+		signer:      signer,
+		cfg:         cfg,
+	}
 }
+
+var _ in.AuthService = (*AuthService)(nil)
 
 func (s *AuthService) RegisterService(ctx context.Context, req *d.RegisterUserInput) error {
 	if req == nil {
@@ -72,8 +88,52 @@ func validateRegisterInput(req *d.RegisterUserInput) error {
 	return nil
 }
 
-func (s *AuthService) LoginService() {
+func (s *AuthService) LoginService(ctx context.Context, req *d.LoginUserInput) (string, error) {
+	if req == nil {
+		return "", fmt.Errorf("authservice.login error: %w", errs.ErrInvalidInput)
+	}
 
+	if err := validateLoginInput(req); err != nil {
+		return "", err
+	}
+
+	user, err := s.userService.GetUserByUsernameService(ctx, req.Username)
+	if err != nil {
+		return "", fmt.Errorf("authservice.login error: %w", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return "", fmt.Errorf("authservice.login error: %w", errs.ErrUnauthorized)
+	}
+
+	claims := gojwt.MapClaims{
+		"user_id":  user.AccountID,
+		"username": user.Username,
+		"email":    user.Email,
+		"iss":      s.cfg.JWT.Issuer,   // ใครออก Token
+		"aud":      s.cfg.JWT.Audience, // ใครใช้ Token
+		"exp":      time.Now().Add(s.cfg.JWT.AccessTokenTTL).Unix(),
+	}
+
+	token, err := s.signer.Sign(claims)
+	if err != nil {
+		return "", fmt.Errorf("authservice.login error: failed to generate token")
+	}
+
+	return token, nil
+}
+
+func validateLoginInput(req *d.LoginUserInput) error {
+	required := map[string]string{
+		"username": req.Username,
+		"password": req.Password,
+	}
+	for _, value := range required {
+		if value == "" {
+			return fmt.Errorf("authservice.login error: %w", errs.ErrInvalidInput)
+		}
+	}
+	return nil
 }
 
 func (s *AuthService) LogoutService() {

@@ -23,6 +23,10 @@ func (fakeAuthService) RegisterService(ctx context.Context, req *d.RegisterUserI
 	return nil
 }
 
+func (fakeAuthService) LoginService(ctx context.Context, req *d.LoginUserInput) (string, error) {
+	return "token", nil
+}
+
 type fakeUserService struct{}
 
 func (fakeUserService) CreateUserService(ctx context.Context, req *d.Users) error {
@@ -31,6 +35,10 @@ func (fakeUserService) CreateUserService(ctx context.Context, req *d.Users) erro
 
 func (fakeUserService) GetByAccountIDService(ctx context.Context, accountID string) (d.Users, error) {
 	return d.Users{AccountID: accountID, Email: "user@example.com"}, nil
+}
+
+func (fakeUserService) GetUserByUsernameService(ctx context.Context, username string) (d.Users, error) {
+	return d.Users{AccountID: "0001", Email: "user@example.com"}, nil
 }
 
 func TestRegisterWiresPublicAndProtectedRoutes(t *testing.T) {
