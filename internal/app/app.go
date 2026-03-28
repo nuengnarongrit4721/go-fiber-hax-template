@@ -24,6 +24,9 @@ type App struct {
 
 var defaultAPIVersions = []string{"v1", "v2"}
 
+/*
+NOTE: Build App
+*/
 func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
 	db, closeDB, err := buildDB(cfg)
 	if err != nil {
@@ -46,6 +49,9 @@ func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}, nil
 }
 
+/*
+NOTE: Build Middleware
+*/
 func buildRouteOptions(cfg config.Config) routes.Options {
 	opts := routes.Options{Versions: defaultAPIVersions}
 	if cfg.Auth.Enabled {
@@ -54,6 +60,9 @@ func buildRouteOptions(cfg config.Config) routes.Options {
 	return opts
 }
 
+/*
+NOTE: Build Repo
+*/
 func buildRepos(db *DB) (Repos, error) {
 	if db.MySQL != nil {
 		return Repos{
@@ -68,6 +77,9 @@ func buildRepos(db *DB) (Repos, error) {
 	return Repos{}, fmt.Errorf("no database available for user repo")
 }
 
+/*
+NOTE: Build Service
+*/
 func buildServices(repos Repos) Services {
 	userService := service.NewUserService(repos.User)
 	authService := service.NewAuthService(userService)
@@ -77,6 +89,9 @@ func buildServices(repos Repos) Services {
 	}
 }
 
+/*
+NOTE: Build Handler
+*/
 func buildHandlers(services Services, logger *slog.Logger) HandlerSet {
 	return HandlerSet{
 		HTTP: handlers.VersionedSet{

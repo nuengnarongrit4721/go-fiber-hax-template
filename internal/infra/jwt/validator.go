@@ -1,4 +1,4 @@
-package middleware
+package jwt
 
 import (
 	"errors"
@@ -7,57 +7,60 @@ import (
 
 	"gofiber-hax/internal/infra/config"
 
-	"github.com/golang-jwt/jwt/v5"
+	gojwt "github.com/golang-jwt/jwt/v5"
 )
 
-type jwtValidator struct {
+type Validator struct {
 	cfg  config.JWTConfig
-	jwks *jwksCache
+	jwks *JwksCache
 	algs []string
 }
 
-func newJWTValidator(cfg config.JWTConfig) *jwtValidator {
+func NewValidator(cfg config.JWTConfig) *Validator {
 	algs := cfg.AllowedAlgs
 	if len(algs) == 0 {
 		algs = []string{"RS256"}
 	}
-	return &jwtValidator{
+	return &Validator{
 		cfg:  cfg,
-		jwks: newJWKSCache(cfg.JWKSURL, cfg.CacheTTL),
+		jwks: NewJwksCache(cfg.JWKSURL, cfg.CacheTTL),
 		algs: algs,
 	}
 }
 
-func (v *jwtValidator) Validate(token string) error {
+func (v *Validator) Validate(token string) (gojwt.MapClaims, error) {
 	if token == "" {
-		return errors.New("token is empty")
+		return nil, errors.New("token is empty")
 	}
 
-	claims := &jwt.RegisteredClaims{}
-	parser := jwt.NewParser(
-		jwt.WithValidMethods(v.algs),
-		jwt.WithLeeway(v.cfg.ClockSkew),
+	claims := gojwt.MapClaims{}
+	parser := gojwt.NewParser(
+		gojwt.WithValidMethods(v.algs),
+		gojwt.WithLeeway(v.cfg.ClockSkew),
 	)
 
-	parsed, err := parser.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
+	parsed, err := parser.ParseWithClaims(token, claims, func(t *gojwt.Token) (any, error) {
 		kid, _ := t.Header["kid"].(string)
 		return v.jwks.GetKey(kid)
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if parsed == nil || !parsed.Valid {
-		return errors.New("invalid token")
+		return nil, errors.New("invalid token")
 	}
 
-	if !issuerAllowed(claims.Issuer, v.cfg.Issuer) {
-		return fmt.Errorf("invalid issuer: %s", claims.Issuer)
-	}
-	if v.cfg.Audience != "" && !audienceAllowed(claims.Audience, v.cfg.Audience) {
-		return fmt.Errorf("invalid audience")
+	issuer, _ := claims.GetIssuer()
+	if !issuerAllowed(issuer, v.cfg.Issuer) {
+		return nil, fmt.Errorf("invalid issuer: %s", issuer)
 	}
 
-	return nil
+	audience, _ := claims.GetAudience()
+	if v.cfg.Audience != "" && !audienceAllowed(audience, v.cfg.Audience) {
+		return nil, fmt.Errorf("invalid audience")
+	}
+
+	return claims, nil
 }
 
 func issuerAllowed(issuer, allowed string) bool {
@@ -78,7 +81,6 @@ func issuerAllowed(issuer, allowed string) bool {
 		if issuer == a {
 			return true
 		}
-		// Google accepts both forms
 		if (a == "https://accounts.google.com" && issuer == "accounts.google.com") ||
 			(a == "accounts.google.com" && issuer == "https://accounts.google.com") {
 			return true
@@ -88,7 +90,7 @@ func issuerAllowed(issuer, allowed string) bool {
 	return false
 }
 
-func audienceAllowed(aud jwt.ClaimStrings, required string) bool {
+func audienceAllowed(aud gojwt.ClaimStrings, required string) bool {
 	if required == "" {
 		return true
 	}

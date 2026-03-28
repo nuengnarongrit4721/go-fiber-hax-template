@@ -1,4 +1,4 @@
-package middleware
+package jwt
 
 import (
 	"crypto/rsa"
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type jwksCache struct {
+type JwksCache struct {
 	url       string
 	ttl       time.Duration
 	client    *http.Client
@@ -35,11 +35,11 @@ type jwkKey struct {
 	E   string `json:"e"`
 }
 
-func newJWKSCache(url string, ttl time.Duration) *jwksCache {
+func NewJwksCache(url string, ttl time.Duration) *JwksCache {
 	if ttl <= 0 {
 		ttl = time.Hour
 	}
-	return &jwksCache{
+	return &JwksCache{
 		url: url,
 		ttl: ttl,
 		client: &http.Client{
@@ -49,7 +49,7 @@ func newJWKSCache(url string, ttl time.Duration) *jwksCache {
 	}
 }
 
-func (c *jwksCache) GetKey(kid string) (*rsa.PublicKey, error) {
+func (c *JwksCache) GetKey(kid string) (*rsa.PublicKey, error) {
 	if kid == "" {
 		return nil, errors.New("missing kid")
 	}
@@ -72,7 +72,7 @@ func (c *jwksCache) GetKey(kid string) (*rsa.PublicKey, error) {
 	return nil, fmt.Errorf("kid not found: %s", kid)
 }
 
-func (c *jwksCache) refreshLocked() error {
+func (c *JwksCache) refreshLocked() error {
 	if c.url == "" {
 		return errors.New("jwks url is empty")
 	}
