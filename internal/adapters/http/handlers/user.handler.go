@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"gofiber-hax/internal/core/ports/in"
+	"gofiber-hax/internal/infra/logs"
 	errs "gofiber-hax/internal/shared/errors"
 	"gofiber-hax/internal/shared/response"
 
@@ -26,10 +27,10 @@ func (h *UserHandler) GetByAccountIDHandler(c *fiber.Ctx) error {
 	}
 	user, err := h.uc.GetByAccountIDService(c.UserContext(), accountID)
 	if err != nil {
+		logs.Error(err)
 		if err == errs.ErrNotFound {
 			return response.Error(c, fiber.StatusNotFound, "user not found")
 		}
-
 		return response.Error(c, fiber.StatusInternalServerError, errs.ErrInternalServer.Error())
 	}
 
