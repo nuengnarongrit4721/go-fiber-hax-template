@@ -24,7 +24,7 @@ func (h *UserHandler) GetByAccountIDHandler(c *fiber.Ctx) error {
 	if accountID == "" {
 		return response.Error(c, fiber.StatusBadRequest, "account_id is required")
 	}
-	user, err := h.uc.GetByAccountIDService(c.Context(), accountID)
+	user, err := h.uc.GetByAccountIDService(c.UserContext(), accountID)
 	if err != nil {
 		if err == errs.ErrNotFound {
 			return response.Error(c, fiber.StatusNotFound, "user not found")

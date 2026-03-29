@@ -11,12 +11,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func autoIndex(db *mongo.Database) error {
+func EnsureIndexes(db *mongo.Database) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	indexes := map[string][]mongo.IndexModel{
 		"users": {
+			{
+				Keys:    bson.D{{Key: "account_id", Value: 1}},
+				Options: options.Index().SetUnique(true),
+			},
 			{
 				Keys:    bson.D{{Key: "username", Value: 1}},
 				Options: options.Index().SetUnique(true),

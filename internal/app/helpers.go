@@ -35,3 +35,20 @@ func wantMongo(mode string) bool {
 func wantMySQL(mode string) bool {
 	return mode == "mysql" || mode == "both" || mode == "auto"
 }
+
+func normalizeAuthMode(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "" {
+		return "jwt"
+	}
+	return mode
+}
+
+func usesInternalJWT(mode string) bool {
+	return normalizeAuthMode(mode) == "jwt"
+}
+
+func isProduction(env string) bool {
+	env = strings.ToLower(strings.TrimSpace(env))
+	return env == "prod" || env == "production"
+}

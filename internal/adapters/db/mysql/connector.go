@@ -25,7 +25,7 @@ func Connect(cfg config.MySQLConfig) (*Connector, error) {
 	}
 
 	if cfg.AutoMigrate {
-		if err := autoMigrate(db); err != nil {
+		if err := Migrate(db); err != nil {
 			return nil, err
 		}
 	}

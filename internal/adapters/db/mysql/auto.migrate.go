@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func autoMigrate(db *gorm.DB) error {
+func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&m.Users{},
 	)

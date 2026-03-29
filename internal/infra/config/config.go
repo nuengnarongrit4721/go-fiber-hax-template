@@ -78,7 +78,7 @@ type RateLimitConfig struct {
 
 type AuthConfig struct {
 	Enabled bool
-	Mode    string // token | jwt | google
+	Mode    string // token | jwt | jwks | google
 	Token   string
 	Header  string
 	Scheme  string
@@ -89,6 +89,8 @@ type JWTConfig struct {
 	Issuer          string
 	Audience        string
 	JWKSURL         string
+	PrivateKeyPath  string
+	KeyID           string
 	CacheTTL        time.Duration
 	ClockSkew       time.Duration
 	AllowedAlgs     []string
@@ -149,10 +151,10 @@ func Load() (Config, error) {
 		Auth: AuthConfig{},
 	}
 
-	authMode := strings.ToLower(getEnv("AUTH_MODE", "token"))
-	jwtIssuer := getEnv("JWT_ISSUER", "")
+	authMode := strings.ToLower(getEnv("AUTH_MODE", "jwt"))
+	jwtIssuer := getEnv("JWT_ISSUER", cfg.App.Name)
 	jwtJWKS := getEnv("JWT_JWKS_URL", "")
-	jwtAud := getEnv("JWT_AUDIENCE", "")
+	jwtAud := getEnv("JWT_AUDIENCE", cfg.App.Name)
 
 	if authMode == "google" {
 		if jwtIssuer == "" {
@@ -173,11 +175,13 @@ func Load() (Config, error) {
 		Header:  getEnv("AUTH_HEADER", "Authorization"),
 		Scheme:  getEnv("AUTH_SCHEME", "Bearer"),
 		JWT: JWTConfig{
-			Issuer:    jwtIssuer,
-			Audience:  jwtAud,
-			JWKSURL:   jwtJWKS,
-			CacheTTL:  time.Duration(getEnvInt("JWT_JWKS_TTL_SEC", 3600)) * time.Second,
-			ClockSkew: time.Duration(getEnvInt("JWT_CLOCK_SKEW_SEC", 60)) * time.Second,
+			Issuer:         jwtIssuer,
+			Audience:       jwtAud,
+			JWKSURL:        jwtJWKS,
+			PrivateKeyPath: getEnv("JWT_PRIVATE_KEY_PATH", "keys/jwt_private.pem"),
+			KeyID:          getEnv("JWT_KEY_ID", "gofiber-hax-key-1"),
+			CacheTTL:       time.Duration(getEnvInt("JWT_JWKS_TTL_SEC", 3600)) * time.Second,
+			ClockSkew:      time.Duration(getEnvInt("JWT_CLOCK_SKEW_SEC", 60)) * time.Second,
 			AllowedAlgs: []string{
 				getEnv("JWT_ALG", "RS256"),
 			},
@@ -189,13 +193,23 @@ func Load() (Config, error) {
 	if cfg.DB.Driver != "auto" && cfg.DB.Driver != "mongo" && cfg.DB.Driver != "mysql" && cfg.DB.Driver != "both" {
 		return Config{}, fmt.Errorf("unsupported DB_DRIVER: %s", cfg.DB.Driver)
 	}
+	if isProduction(cfg.App.Env) && cfg.DB.MySQL.AutoMigrate {
+		return Config{}, fmt.Errorf("MYSQL_AUTO_MIGRATE must be false in production; use the migrate command instead")
+	}
 	if cfg.Auth.Enabled {
 		switch cfg.Auth.Mode {
 		case "", "token":
 			if cfg.Auth.Token == "" {
 				return Config{}, fmt.Errorf("AUTH_MODE=token but AUTH_TOKEN is empty")
 			}
-		case "jwt", "google":
+		case "jwt":
+			if cfg.Auth.JWT.Issuer == "" || cfg.Auth.JWT.Audience == "" {
+				return Config{}, fmt.Errorf("AUTH_MODE=jwt requires JWT_ISSUER and JWT_AUDIENCE")
+			}
+			if cfg.Auth.JWT.PrivateKeyPath == "" {
+				return Config{}, fmt.Errorf("AUTH_MODE=jwt requires JWT_PRIVATE_KEY_PATH")
+			}
+		case "jwks", "google":
 			if cfg.Auth.JWT.JWKSURL == "" || cfg.Auth.JWT.Issuer == "" {
 				return Config{}, fmt.Errorf("AUTH_MODE=%s requires JWT_ISSUER and JWT_JWKS_URL", cfg.Auth.Mode)
 			}
@@ -212,11 +226,16 @@ func Load() (Config, error) {
 
 func loadEnv() {
 	env := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
-	if env == "prod" || env == "production" {
+	if isProduction(env) {
 		_ = godotenv.Load(".env")
 		return
 	}
 	_ = godotenv.Overload(".env")
+}
+
+func isProduction(env string) bool {
+	env = strings.ToLower(strings.TrimSpace(env))
+	return env == "prod" || env == "production"
 }
 
 func getEnv(key, def string) string {

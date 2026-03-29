@@ -97,6 +97,7 @@ func customErrorHandler(logger *slog.Logger) fiber.ErrorHandler {
 		}
 		if code >= fiber.StatusInternalServerError && logger != nil {
 			logger.Error("http error",
+				"request_id", c.GetRespHeader("X-Request-ID"),
 				"method", c.Method(),
 				"path", c.Path(),
 				"status", code,

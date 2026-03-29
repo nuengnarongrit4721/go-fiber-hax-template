@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	d "gofiber-hax/internal/core/domain"
@@ -12,6 +13,7 @@ import (
 	errs "gofiber-hax/internal/shared/errors"
 
 	gojwt "github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -45,6 +47,11 @@ func (s *AuthService) RegisterService(ctx context.Context, req *d.RegisterUserIn
 	if req.Password != req.ConfirmPassword {
 		return fmt.Errorf("authservice.register error: %w", errs.ErrInvalidInput)
 	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Username = strings.TrimSpace(req.Username)
+	req.Phone = strings.TrimSpace(req.Phone)
+	req.Fname = strings.TrimSpace(req.Fname)
+	req.Lname = strings.TrimSpace(req.Lname)
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -96,6 +103,7 @@ func (s *AuthService) LoginService(ctx context.Context, req *d.LoginUserInput) (
 	if err := validateLoginInput(req); err != nil {
 		return "", err
 	}
+	req.Username = strings.TrimSpace(req.Username)
 
 	user, err := s.userService.GetUserByUsernameService(ctx, req.Username)
 	if err != nil {
@@ -106,13 +114,18 @@ func (s *AuthService) LoginService(ctx context.Context, req *d.LoginUserInput) (
 		return "", fmt.Errorf("authservice.login error: %w", errs.ErrUnauthorized)
 	}
 
+	now := time.Now()
 	claims := gojwt.MapClaims{
+		"sub":      user.AccountID,
+		"jti":      uuid.NewString(),
 		"user_id":  user.AccountID,
 		"username": user.Username,
 		"email":    user.Email,
-		"iss":      s.cfg.JWT.Issuer,   // ใครออก Token
-		"aud":      s.cfg.JWT.Audience, // ใครใช้ Token
-		"exp":      time.Now().Add(s.cfg.JWT.AccessTokenTTL).Unix(),
+		"iss":      s.cfg.JWT.Issuer,
+		"aud":      s.cfg.JWT.Audience,
+		"iat":      now.Unix(),
+		"nbf":      now.Unix(),
+		"exp":      now.Add(s.cfg.JWT.AccessTokenTTL).Unix(),
 	}
 
 	token, err := s.signer.Sign(claims)

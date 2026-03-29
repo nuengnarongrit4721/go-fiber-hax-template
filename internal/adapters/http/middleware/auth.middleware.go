@@ -12,14 +12,33 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func Auth(cfg config.AuthConfig) fiber.Handler {
+type AuthOption func(*authOptions)
+
+type authOptions struct {
+	validator *jwt.Validator
+}
+
+func WithJWTValidator(v *jwt.Validator) AuthOption {
+	return func(o *authOptions) {
+		o.validator = v
+	}
+}
+
+func Auth(cfg config.AuthConfig, opts ...AuthOption) fiber.Handler {
 	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
 	if mode == "" {
-		mode = "token"
+		mode = "jwt"
 	}
 
-	var jwtVal *jwt.Validator
-	if mode == "jwt" || mode == "google" {
+	options := authOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+
+	jwtVal := options.validator
+	if jwtVal == nil && (mode == "jwks" || mode == "google") {
 		jwtVal = jwt.NewValidator(cfg.JWT)
 	}
 
@@ -39,7 +58,7 @@ func Auth(cfg config.AuthConfig) fiber.Handler {
 			if strings.TrimSpace(cfg.Token) == "" || token != strings.TrimSpace(cfg.Token) {
 				return response.Error(c, fiber.StatusUnauthorized, "unauthorized")
 			}
-		case "jwt", "google":
+		case "jwt", "jwks", "google":
 			if jwtVal == nil {
 				return response.Error(c, fiber.StatusUnauthorized, "unauthorized")
 			}

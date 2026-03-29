@@ -2,9 +2,13 @@ package app
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 
+	repoMongo "gofiber-hax/internal/adapters/db/mongo/repository"
 	repoMsql "gofiber-hax/internal/adapters/db/mysql/repository"
 	httpadapter "gofiber-hax/internal/adapters/http"
 	"gofiber-hax/internal/adapters/http/handlers"
@@ -28,13 +32,10 @@ var defaultAPIVersions = []string{"v1", "v2"}
 NOTE: Build App
 */
 func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
-
-	// รันตัวปั๊มกุญแจ หาไฟล์ไม่เจอก็สร้างให้เลย
-	priv, pub, err := jwt.LoadOrGenerateKeys("keys/jwt_private.pem")
+	signer, err := buildSigner(cfg)
 	if err != nil {
 		return nil, err
 	}
-	signer := jwt.NewSigner(priv, pub)
 
 	db, closeDB, err := buildDB(cfg)
 	if err != nil {
@@ -49,7 +50,7 @@ func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
 	services := buildServices(cfg, repos, signer)
 	handlers := buildHandlers(services, logger, signer)
 
-	server := httpadapter.NewServer(cfg.HTTP, handlers.HTTP, buildRouteOptions(cfg), logger)
+	server := httpadapter.NewServer(cfg.HTTP, handlers.HTTP, buildRouteOptions(cfg, signer), logger)
 
 	return &App{
 		HTTP:  server,
@@ -60,10 +61,10 @@ func Build(cfg config.Config, logger *slog.Logger) (*App, error) {
 /*
 NOTE: Build Middleware
 */
-func buildRouteOptions(cfg config.Config) routes.Options {
+func buildRouteOptions(cfg config.Config, signer *jwt.Signer) routes.Options {
 	opts := routes.Options{Versions: defaultAPIVersions}
 	if cfg.Auth.Enabled {
-		opts.Protected = []fiber.Handler{middleware.Auth(cfg.Auth)}
+		opts.Protected = []fiber.Handler{middleware.Auth(cfg.Auth, middleware.WithJWTValidator(buildJWTValidator(cfg, signer)))}
 	}
 	return opts
 }
@@ -72,16 +73,36 @@ func buildRouteOptions(cfg config.Config) routes.Options {
 NOTE: Build Repo
 */
 func buildRepos(db *DB) (Repos, error) {
-	if db.MySQL != nil {
+	switch db.Driver {
+	case "mongo":
+		if db.Mongo == nil {
+			return Repos{}, fmt.Errorf("mongo driver selected but mongo is not connected")
+		}
+		return Repos{
+			User: repoMongo.NewUserRepo(db.Mongo.DB),
+		}, nil
+
+	case "mysql":
+		if db.MySQL == nil {
+			return Repos{}, fmt.Errorf("mysql driver selected but mysql is not connected")
+		}
 		return Repos{
 			User: repoMsql.NewUserRepo(db.MySQL.DB),
 		}, nil
+
+	case "both", "auto":
+		if db.MySQL != nil {
+			return Repos{
+				User: repoMsql.NewUserRepo(db.MySQL.DB),
+			}, nil
+		}
+		if db.Mongo != nil {
+			return Repos{
+				User: repoMongo.NewUserRepo(db.Mongo.DB),
+			}, nil
+		}
 	}
-	if db.Mongo != nil {
-		return Repos{
-			// User: repoMogo.NewUserRepo(db.Mongo.DB),
-		}, nil
-	}
+
 	return Repos{}, fmt.Errorf("no database available for user repo")
 }
 
@@ -90,7 +111,10 @@ NOTE: Build Service
 */
 func buildServices(cfg config.Config, repos Repos, signer *jwt.Signer) Services {
 	userService := service.NewUserService(repos.User)
-	authService := service.NewAuthService(userService, signer, cfg.Auth)
+	var authService *service.AuthService
+	if signer != nil {
+		authService = service.NewAuthService(userService, signer, cfg.Auth)
+	}
 	return Services{
 		User: userService,
 		Auth: authService,
@@ -101,16 +125,80 @@ func buildServices(cfg config.Config, repos Repos, signer *jwt.Signer) Services 
 NOTE: Build Handler
 */
 func buildHandlers(services Services, logger *slog.Logger, signer *jwt.Signer) HandlerSet {
+	var authHandler *handlers.AuthHandler
+	var jwksHandler *handlers.JWKSHandler
+	if services.Auth != nil {
+		authHandler = handlers.NewAuthHandler(services.Auth)
+	}
+	if signer != nil {
+		jwksHandler = handlers.NewJwksHandler(signer)
+	}
+
 	return HandlerSet{
 		HTTP: handlers.VersionedSet{
 			V1: handlers.Set{
 				User: handlers.NewUserHandler(services.User, logger),
-				Auth: handlers.NewAuthHandler(services.Auth),
-				JWKS: handlers.NewJwksHandler(signer),
+				Auth: authHandler,
+				JWKS: jwksHandler,
 			},
 			V2: handlers.Set{
 				User: nil,
 			},
 		},
+	}
+}
+
+/*
+NOTE: Build Singner สำหรับ JWT
+*/
+func buildSigner(cfg config.Config) (*jwt.Signer, error) {
+	if !usesInternalJWT(cfg.Auth.Mode) {
+		return nil, nil
+	}
+
+	keyPath := strings.TrimSpace(cfg.Auth.JWT.PrivateKeyPath)
+	if keyPath == "" {
+		return nil, fmt.Errorf("JWT_PRIVATE_KEY_PATH is required for internal JWT mode")
+	}
+
+	var (
+		priv *rsa.PrivateKey
+		pub  *rsa.PublicKey
+		err  error
+	)
+
+	if isProduction(cfg.App.Env) {
+		if _, statErr := os.Stat(keyPath); statErr != nil {
+			if os.IsNotExist(statErr) {
+				return nil, fmt.Errorf("jwt private key not found at %s; create it before starting production", keyPath)
+			}
+			return nil, statErr
+		}
+		priv, pub, err = jwt.LoadKeys(keyPath)
+	} else {
+		priv, pub, err = jwt.LoadOrGenerateKeys(keyPath)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return jwt.NewSigner(priv, pub, cfg.Auth.JWT.KeyID), nil
+}
+
+/*
+NOTE: Build Validator สำหรับ JWT
+*/
+func buildJWTValidator(cfg config.Config, signer *jwt.Signer) *jwt.Validator {
+	mode := normalizeAuthMode(cfg.Auth.Mode)
+	switch mode {
+	case "jwt":
+		if signer == nil {
+			return nil
+		}
+		return jwt.NewValidator(cfg.Auth.JWT, jwt.WithStaticPublicKey(signer.PublicKey()))
+	case "jwks", "google":
+		return jwt.NewValidator(cfg.Auth.JWT)
+	default:
+		return nil
 	}
 }

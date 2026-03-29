@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"crypto"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,21 +12,47 @@ import (
 )
 
 type Validator struct {
-	cfg  config.JWTConfig
-	jwks *JwksCache
-	algs []string
+	cfg     config.JWTConfig
+	jwks    *JwksCache
+	algs    []string
+	keyFunc func(*gojwt.Token) (any, error)
 }
 
-func NewValidator(cfg config.JWTConfig) *Validator {
+type ValidatorOption func(*Validator)
+
+func WithStaticPublicKey(key crypto.PublicKey) ValidatorOption {
+	return func(v *Validator) {
+		if key == nil {
+			return
+		}
+		v.keyFunc = func(_ *gojwt.Token) (any, error) {
+			return key, nil
+		}
+	}
+}
+
+func NewValidator(cfg config.JWTConfig, opts ...ValidatorOption) *Validator {
 	algs := cfg.AllowedAlgs
 	if len(algs) == 0 {
 		algs = []string{"RS256"}
 	}
-	return &Validator{
+	v := &Validator{
 		cfg:  cfg,
 		jwks: NewJwksCache(cfg.JWKSURL, cfg.CacheTTL),
 		algs: algs,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(v)
+		}
+	}
+	if v.keyFunc == nil {
+		v.keyFunc = func(t *gojwt.Token) (any, error) {
+			kid, _ := t.Header["kid"].(string)
+			return v.jwks.GetKey(kid)
+		}
+	}
+	return v
 }
 
 func (v *Validator) Validate(token string) (gojwt.MapClaims, error) {
@@ -39,10 +66,7 @@ func (v *Validator) Validate(token string) (gojwt.MapClaims, error) {
 		gojwt.WithLeeway(v.cfg.ClockSkew),
 	)
 
-	parsed, err := parser.ParseWithClaims(token, claims, func(t *gojwt.Token) (any, error) {
-		kid, _ := t.Header["kid"].(string)
-		return v.jwks.GetKey(kid)
-	})
+	parsed, err := parser.ParseWithClaims(token, claims, v.keyFunc)
 	if err != nil {
 		return nil, err
 	}

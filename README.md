@@ -7,9 +7,9 @@ Hexagonal (Ports & Adapters) starter for GoFiber with manual DI, multi-DB (Mongo
 - Manual DI (composition root in one place)
 - Multi-DB support (Mongo + MySQL, optional MySQL replica)
 - Versioned API routes (v1/v2 handlers separated)
-- Pretty logs for dev (multi-line, array-friendly)
-- Self-Hosted Identity Provider (RS256 JWKS) with Automated Key Generation
-- Flexible Auth Middleware: Token, Self-Hosted JWT, or Google OAuth
+- Request validation and centralized error handling
+- Production hardening: request ID, recover, timeout, rate limit, access log
+- Auth modes: static token, internal JWT, external JWKS, or Google ID token
 
 ## Project Structure (simplified)
 ```
@@ -30,6 +30,7 @@ internal/
 ## Quick Start
 ```bash
 go mod tidy
+go run . migrate
 go run . start
 ```
 
@@ -74,23 +75,31 @@ HTTP_ACCESS_LOG_FORMAT=${ip} - - [${time}] "${method} ${url} ${protocol}" ${stat
 HTTP_ACCESS_LOG_TIME_FORMAT=02/Jan/2006:15:04:05 -0700
 
 # Auth (protected routes)
-AUTH_ENABLED=false
-AUTH_MODE=token   # token | jwt | google
-AUTH_TOKEN=
+AUTH_ENABLED=true
+AUTH_MODE=jwt   # token | jwt | jwks | google
 AUTH_HEADER=Authorization
 AUTH_SCHEME=Bearer
 
-# JWT / Google OAuth (ID token)
-GOOGLE_CLIENT_ID=
+# Static token mode
+AUTH_TOKEN=
+
+# Internal JWT mode
 JWT_ALG=RS256
-JWT_ISSUER=http://localhost:5001
-JWT_AUDIENCE=gofiber-hax-client
-JWT_JWKS_URL=http://127.0.0.1:5001/api/.well-known/jwks.json
+JWT_PRIVATE_KEY_PATH=keys/jwt_private.pem
+JWT_KEY_ID=gofiber-hax-key-1
+JWT_ISSUER=gofiber-hax
+JWT_AUDIENCE=gofiber-hax
 JWT_JWKS_TTL_SEC=3600
 JWT_CLOCK_SKEW_SEC=60
 JWT_ACCESS_TTL_SEC=900
 JWT_REFRESH_TTL_SEC=604800
-JWT_CLOCK_SKEW_SEC=60
+
+# External JWKS / Google
+JWT_JWKS_URL=
+GOOGLE_CLIENT_ID=
+
+# Production recommendation
+MYSQL_AUTO_MIGRATE=false
 ```
 
 ## Routes
@@ -101,13 +110,13 @@ Base prefix: `/api/{version}`
 - `POST /api/v1/auth/login` (issues RS256 JWT)
 - `GET /api/v1/users/:account_id` (protected)
 
-Identity Provider (IdP) endpoints:
-- `GET /api/.well-known/jwks.json` (Exposes Public Key Set for dynamic JWT verification)
+Identity Provider (internal JWT mode only):
+- `GET /api/.well-known/jwks.json`
 
 Versioned handlers are separated in code (`V1`, `V2`) to allow different behavior per version.
 
 ## Auth Modes
-Simple token:
+Static token:
 ```
 AUTH_ENABLED=true
 AUTH_MODE=token
@@ -118,16 +127,36 @@ Request example:
 Authorization: Bearer secret123
 ```
 
-Self-Hosted JWT (Asymmetric RS256):
+Internal JWT (recommended default):
 ```env
 AUTH_ENABLED=true
 AUTH_MODE=jwt
 JWT_ALG=RS256
-JWT_ISSUER=http://localhost:5001
-JWT_AUDIENCE=gofiber-hax-client
-JWT_JWKS_URL=http://127.0.0.1:5001/api/.well-known/jwks.json
+JWT_PRIVATE_KEY_PATH=keys/jwt_private.pem
+JWT_KEY_ID=gofiber-hax-key-1
+JWT_ISSUER=gofiber-hax
+JWT_AUDIENCE=gofiber-hax
 ```
-*Note: The system automatically provisions and persists an RSA-2048 key pair in `keys/jwt_private.pem` upon startup.*
+Behavior:
+- `POST /api/v1/auth/login` issues RS256 JWT
+- protected middleware validates that JWT with the local public key
+- `GET /api/.well-known/jwks.json` exposes the public key set for downstream consumers
+
+Note:
+- in `dev`, if `JWT_PRIVATE_KEY_PATH` does not exist, the key is generated automatically
+- in `prod`, the key must already exist before startup
+- this template uses a `single active key` model for simplicity
+- the key is loaded once at startup; changing the key file requires an app restart
+- if you replace the key and restart, previously issued JWTs may become invalid immediately
+
+External JWKS:
+```env
+AUTH_ENABLED=true
+AUTH_MODE=jwks
+JWT_ISSUER=https://issuer.example.com
+JWT_AUDIENCE=my-api
+JWT_JWKS_URL=https://issuer.example.com/.well-known/jwks.json
+```
 
 Google ID Token:
 ```
@@ -143,10 +172,21 @@ GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 - HTTP access log uses Common Log Format (configure `HTTP_ACCESS_LOG_FORMAT` and `HTTP_ACCESS_LOG_TIME_FORMAT`)
 - See `internal/infra/logs/README.md` for usage and formats
 
+## Production Key Management
+- `AUTH_MODE=jwt` on production expects an existing private key file before the app starts.
+- Do not rely on runtime key generation in production.
+- Keep the private key outside the image, managed by DevOps as a secret.
+- Mount or inject the key file into the runtime, then set `JWT_PRIVATE_KEY_PATH` to that path.
+- If a deploy replaces the key file with a different key, previously issued JWTs may stop working after restart.
+- For this template, key management intentionally stays at `single active key` to keep the auth flow simple.
+
 ## Notes
-- MySQL uses GORM; auto-migration is optional via `MYSQL_AUTO_MIGRATE=true`.
+- Run `go run . migrate` to apply MySQL migrations and ensure Mongo indexes.
+- `MYSQL_AUTO_MIGRATE=true` is allowed for dev only. In production it is rejected at config load.
 - When `DB_DRIVER=both`, the User repo currently prefers MySQL.
-- For real OAuth (access token introspection), add an introspection validator (not included yet).
+- `AUTH_MODE=jwt` is the only mode that wires internal `/auth/register` and `/auth/login`.
+- `AUTH_MODE=jwks` and `AUTH_MODE=google` are validation-only modes.
+- `AUTH_MODE=jwt` intentionally stays on `single active key` for this template to keep the auth flow clean and maintainable.
 
 ## Adding New Feature (example flow)
 ```
@@ -161,4 +201,3 @@ handler -> service -> repo (port out) -> adapter
 
 ## License
 MIT (or update as needed)
-# go-fiber-hax-template

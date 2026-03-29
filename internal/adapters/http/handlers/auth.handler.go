@@ -6,6 +6,7 @@ import (
 	d "gofiber-hax/internal/core/domain"
 	"gofiber-hax/internal/core/ports/in"
 	"gofiber-hax/internal/infra/logs"
+	"gofiber-hax/internal/infra/validation"
 	errs "gofiber-hax/internal/shared/errors"
 	"gofiber-hax/internal/shared/response"
 
@@ -22,7 +23,7 @@ func NewAuthHandler(as in.AuthService) *AuthHandler {
 
 func (h *AuthHandler) LoginEndpoint(c *fiber.Ctx) error {
 	var req dto.LoginRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := validation.BindAndValidate(c, &req); err != nil {
 		logs.Error(err)
 		return response.Error(c, fiber.StatusBadRequest, errs.ErrInvalidInput.Error())
 	}
@@ -51,7 +52,7 @@ func (h *AuthHandler) LoginEndpoint(c *fiber.Ctx) error {
 
 func (h *AuthHandler) RegisterEndpoint(c *fiber.Ctx) error {
 	var req dto.RegisterRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := validation.BindAndValidate(c, &req); err != nil {
 		logs.Error(err)
 		return response.Error(c, fiber.StatusBadRequest, errs.ErrInvalidInput.Error())
 	}
@@ -70,6 +71,9 @@ func (h *AuthHandler) RegisterEndpoint(c *fiber.Ctx) error {
 		logs.Error(err)
 		if errors.Is(err, errs.ErrInvalidInput) {
 			return response.Error(c, fiber.StatusBadRequest, errs.ErrInvalidInput.Error())
+		}
+		if errors.Is(err, errs.ErrConflict) {
+			return response.Error(c, fiber.StatusConflict, errs.ErrConflict.Error())
 		}
 		return response.Error(c, fiber.StatusInternalServerError, errs.ErrInternalServer.Error())
 	}

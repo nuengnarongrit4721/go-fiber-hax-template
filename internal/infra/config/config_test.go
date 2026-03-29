@@ -36,6 +36,17 @@ func TestLoadKeepsSystemEnvInProduction(t *testing.T) {
 	})
 }
 
+func TestLoadRejectsAutoMigrateInProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+
+	withTempEnvFile(t, "MYSQL_AUTO_MIGRATE=true\n", func() {
+		_, err := Load()
+		if err == nil {
+			t.Fatal("expected production auto migrate error")
+		}
+	})
+}
+
 func withTempEnvFile(t *testing.T, content string, fn func()) {
 	t.Helper()
 

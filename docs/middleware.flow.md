@@ -182,18 +182,20 @@ Auth middleware ทำงานตามลำดับนี้
 2. ดึง token จาก header
 3. ถ้า `AUTH_MODE=token`
    - เทียบ token กับ `AUTH_TOKEN`
-4. ถ้า `AUTH_MODE=jwt` หรือ `AUTH_MODE=google`
+4. ถ้า `AUTH_MODE=jwt`
+   - ตรวจ JWT ด้วย local public key ของระบบ
+5. ถ้า `AUTH_MODE=jwks` หรือ `AUTH_MODE=google`
    - เรียก `jwtValidator.Validate(token)`
-5. ถ้าตรวจไม่ผ่าน
+6. ถ้าตรวจไม่ผ่าน
    - return `401 unauthorized`
-6. ถ้าผ่าน
+7. ถ้าผ่าน
    - ไปต่อที่ handler
 
-## JWT / Google Validation Flow
+## JWT Validation Flow
 
 ไฟล์ที่เกี่ยวข้อง:
-- `internal/adapters/http/middleware/jwt.validator.middleware.go`
-- `internal/adapters/http/middleware/jwks.cache.middleware.go`
+- `internal/infra/jwt/validator.go`
+- `internal/infra/jwt/jwks_cache.go`
 
 ### Flow
 
@@ -202,10 +204,13 @@ Auth()
 -> jwtValidator.Validate(token)
    -> Parse JWT
    -> ตรวจ allowed algorithms
-   -> ดึง kid จาก header
-   -> jwksCache.GetKey(kid)
-      -> ถ้า cache หมดอายุ ให้ refresh จาก JWKS URL
-      -> แปลง JWK เป็น RSA public key
+   -> ถ้าเป็น internal JWT:
+      -> ใช้ local public key
+   -> ถ้าเป็น JWKS / Google:
+      -> ดึง kid จาก header
+      -> jwksCache.GetKey(kid)
+         -> ถ้า cache หมดอายุ ให้ refresh จาก JWKS URL
+         -> แปลง JWK เป็น RSA public key
    -> ตรวจ signature
    -> ตรวจ issuer
    -> ตรวจ audience
@@ -214,8 +219,111 @@ Auth()
 
 ### หมายเหตุ
 
-- `google` คือรูปแบบหนึ่งของ JWT validation
-- ความต่างคือ config default จะถูกเติมให้เป็นของ Google เช่น issuer และ JWKS URL
+- `jwt` คือ token ที่ระบบนี้ออกเองและตรวจด้วย local public key
+- `jwks` คือ external issuer ที่ตรวจผ่าน JWKS URL
+- `google` คือ `jwks` แบบ preset ค่า Google
+- สำหรับ template นี้ `AUTH_MODE=jwt` ใช้ `single active key`
+- key ถูกโหลดเข้า memory ตอน app start เพียงครั้งเดียว
+- ถ้าเปลี่ยน key file ต้อง restart app
+- ถ้าเปลี่ยน key แล้ว restart, JWT เก่าที่เซ็นด้วย key เดิมอาจใช้ไม่ได้ทันที
+
+## Mermaid Sequence Diagrams
+
+### Internal JWT: Login Request
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant R as Router
+    participant H as AuthHandler
+    participant A as AuthService
+    participant U as UserService
+    participant Repo as UserRepo
+    participant DB as Database
+    participant S as Signer
+
+    C->>R: POST /api/v1/auth/login
+    R->>H: LoginEndpoint
+    H->>A: LoginService(ctx, username, password)
+    A->>U: GetUserByUsernameService(ctx, username)
+    U->>Repo: GetByUsername(ctx, username)
+    Repo->>DB: SELECT user by username
+    DB-->>Repo: user row
+    Repo-->>U: domain user
+    U-->>A: domain user
+    A->>A: bcrypt compare
+    A->>S: Sign(claims)
+    S-->>A: JWT token
+    A-->>H: access_token
+    H-->>C: 200 JSON
+```
+
+### Internal JWT: Protected Request
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as Auth Middleware
+    participant V as Validator
+    participant H as UserHandler
+    participant U as UserService
+    participant Repo as UserRepo
+    participant DB as Database
+
+    C->>M: GET /api/v1/users/:account_id + Bearer JWT
+    M->>M: extractToken()
+    M->>V: Validate(token)
+    V->>V: Parse JWT
+    V->>V: Verify signature with local public key
+    V->>V: Verify iss / aud
+    V-->>M: claims
+    M->>H: next()
+    H->>U: GetByAccountIDService(ctx, account_id)
+    U->>Repo: GetByAccountID(ctx, account_id)
+    Repo->>DB: SELECT user by account_id
+    DB-->>Repo: user row
+    Repo-->>U: domain user
+    U-->>H: domain user
+    H-->>C: 200 JSON
+```
+
+### External JWKS / Google: Protected Request
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant M as Auth Middleware
+    participant V as Validator
+    participant K as JwksCache
+    participant P as External JWKS Provider
+    participant H as UserHandler
+    participant U as UserService
+    participant Repo as UserRepo
+    participant DB as Database
+
+    C->>M: GET /api/v1/users/:account_id + Bearer external JWT
+    M->>M: extractToken()
+    M->>V: Validate(token)
+    V->>V: Parse JWT
+    V->>K: GetKey(kid)
+    alt cache hit
+        K-->>V: public key
+    else cache miss / expired
+        K->>P: GET /.well-known/jwks.json
+        P-->>K: JWKS JSON
+        K-->>V: public key
+    end
+    V->>V: Verify signature / iss / aud
+    V-->>M: claims
+    M->>H: next()
+    H->>U: GetByAccountIDService(ctx, account_id)
+    U->>Repo: GetByAccountID(ctx, account_id)
+    Repo->>DB: SELECT user by account_id
+    DB-->>Repo: user row
+    Repo-->>U: domain user
+    U-->>H: domain user
+    H-->>C: 200 JSON
+```
 
 ## Public Route Example
 
@@ -281,10 +389,10 @@ Client
 - `auth.middleware.go`
   - ตรวจสิทธิ์เข้า protected routes
 
-- `jwt.validator.middleware.go`
+- `validator.go`
   - ตรวจ JWT claims และ signature
 
-- `jwks.cache.middleware.go`
+- `jwks_cache.go`
   - cache public key จาก JWKS endpoint
 
 - `handlers`
@@ -301,3 +409,4 @@ Client
 - access logger ถูกใช้แบบ global ทุก request แต่เปิด/ปิดได้จาก config
 - auth middleware ถูกใช้เฉพาะ protected routes
 - rate limiting เปิดใช้งานได้จาก config และมี default ให้พร้อมใช้
+- key rotation แบบ zero-downtime ยังไม่อยู่ใน template นี้โดยตั้งใจ เพื่อคงโครงให้เรียบและดูแลง่าย
