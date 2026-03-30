@@ -111,7 +111,10 @@ NOTE: Build Service
 */
 func buildServices(cfg config.Config, repos Repos, signer *jwt.Signer) Services {
 	userService := service.NewUserService(repos.User)
-	authService := service.NewAuthService(userService, signer, cfg.Auth)
+	var authService *service.AuthService
+	if signer != nil {
+		authService = service.NewAuthService(userService, signer, cfg.Auth)
+	}
 	return Services{
 		User: userService,
 		Auth: authService,
@@ -122,16 +125,20 @@ func buildServices(cfg config.Config, repos Repos, signer *jwt.Signer) Services 
 NOTE: Build Handler
 */
 func buildHandlers(services Services, logger *slog.Logger, signer *jwt.Signer) HandlerSet {
+	var authHandler *handlers.AuthHandler
 	var jwksHandler *handlers.JWKSHandler
+	if services.Auth != nil {
+		authHandler = handlers.NewAuthHandler(services.Auth)
+	}
 	if signer != nil {
 		jwksHandler = handlers.NewJwksHandler(signer)
 	}
 	return HandlerSet{
 		HTTP: handlers.VersionedSet{
 			V1: handlers.Set{
-				User: handlers.NewUserHandler(services.User, logger),
-				Auth: handlers.NewAuthHandler(services.Auth),
+				Auth: authHandler,
 				JWKS: jwksHandler,
+				User: handlers.NewUserHandler(services.User, logger),
 			},
 			V2: handlers.Set{
 				User: nil,
